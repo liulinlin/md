@@ -115,11 +115,13 @@ function applyTemplate(postId: string) {
 </script>
 
 <template>
-  <div v-for="post in props.sortedPosts.filter(p => (props.parentId == null && p.parentId == null) || p.parentId === props.parentId)" :key="post.id">
+  <div
+    v-for="post in props.sortedPosts.filter(p => (props.parentId == null && p.parentId == null) || p.parentId === props.parentId)"
+    :key="post.id"
+  >
     <!-- 根文章外层容器 -->
     <a
-      class="w-full inline-flex cursor-pointer items-center gap-1 rounded p-2 text-sm transition-colors"
-      :class="[
+      class="w-full inline-flex cursor-pointer items-center gap-1 rounded p-2 text-sm transition-colors" :class="[
         // eslint-disable-next-line vue/prefer-separate-static-class
         'hover:text-primary-foreground hover:bg-primary',
         {
@@ -128,27 +130,16 @@ function applyTemplate(postId: string) {
           'outline-2 outline-dashed outline-primary  border-gray-200 bg-gray-400/50 dark:border-gray-200 dark:bg-gray-500/50':
             props.dropTargetId === post.id,
         },
-      ]"
-      draggable="true"
-      @dragstart="handleDragStart(post.id, $event)"
-      @dragend="props.handleDragEnd"
-      @drop.prevent="props.handleDrop(post.id)"
-      @dragover.stop.prevent="props.setDropTargetId(post.id)"
-      @dragleave.prevent="props.setDropTargetId(null)"
-      @click="currentPostId = post.id"
+      ]" draggable="true" @dragstart="handleDragStart(post.id, $event)" @dragend="props.handleDragEnd"
+      @drop.prevent="props.handleDrop(post.id)" @dragover.stop.prevent="props.setDropTargetId(post.id)"
+      @dragleave.prevent="props.setDropTargetId(null)" @click="currentPostId = post.id"
     >
       <!-- 折叠展开图标 -->
       <Button
-        size="xs"
-        variant="ghost"
-        class="h-max p-0.5"
-        :class="isHasChild(post.id) ? 'opacity-100' : 'opacity-0'"
+        size="xs" variant="ghost" class="h-max p-0.5" :class="isHasChild(post.id) ? 'opacity-100' : 'opacity-0'"
         @click.stop="isHasChild(post.id) && togglePostExpanded(post.id)"
       >
-        <ChevronRight
-          class="size-4 transition-transform"
-          :class="{ 'rotate-90': !post.collapsed }"
-        />
+        <ChevronRight class="size-4 transition-transform" :class="{ 'rotate-90': !post.collapsed }" />
       </Button>
 
       <span class="line-clamp-1">{{ post.title }}</span>
@@ -156,15 +147,11 @@ function applyTemplate(postId: string) {
       <!-- 每条文章操作 -->
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
-          <Button
-            size="xs"
-            variant="ghost"
-            class="ml-auto h-max p-0.5"
-          >
+          <Button size="xs" variant="ghost" class="ml-auto h-max p-0.5">
             <Ellipsis class="size-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent>
+        <DropdownMenuContent class="z-[60]">
           <DropdownMenuItem @click.stop="props.openAddPostDialog(post.id)">
             <PlusSquare class="mr-2 size-4" /> 新增内容
           </DropdownMenuItem>
@@ -182,10 +169,7 @@ function applyTemplate(postId: string) {
             <FileInput class="mr-2 size-4" /> 应用模板
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            v-if="posts.length > 1"
-            @click.stop="props.startDelPost(post.id)"
-          >
+          <DropdownMenuItem v-if="posts.length > 1" @click.stop="props.startDelPost(post.id)">
             <Trash2 class="mr-2 size-4" /> 删除
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -197,17 +181,11 @@ function applyTemplate(postId: string) {
       class="space-y-1 ml-4 mt-1 border-l-2 border-gray-300 pl-1 dark:border-gray-700"
     >
       <PostItem
-        :parent-id="post.id"
-        :sorted-posts="props.sortedPosts"
-        :start-rename-post="props.startRenamePost"
-        :open-history-dialog="props.openHistoryDialog"
-        :start-del-post="props.startDelPost"
-        :drag-source-id="props.dragSourceId"
-        :set-drag-source-id="props.setDragSourceId"
-        :drop-target-id="props.dropTargetId"
-        :set-drop-target-id="props.setDropTargetId"
-        :handle-drag-end="props.handleDragEnd"
-        :handle-drop="props.handleDrop"
+        :parent-id="post.id" :sorted-posts="props.sortedPosts" :start-rename-post="props.startRenamePost"
+        :open-history-dialog="props.openHistoryDialog" :start-del-post="props.startDelPost"
+        :drag-source-id="props.dragSourceId" :set-drag-source-id="props.setDragSourceId"
+        :drop-target-id="props.dropTargetId" :set-drop-target-id="props.setDropTargetId"
+        :handle-drag-end="props.handleDragEnd" :handle-drop="props.handleDrop"
         :open-add-post-dialog="props.openAddPostDialog"
       />
     </div>
