@@ -212,40 +212,32 @@ function handleDragEnd() {
 
 <template>
   <!-- 移动端遮罩层 -->
-  <div
-    v-if="isMobile && isOpenPostSlider"
-    class="fixed inset-0 bg-black/50 z-40"
-    @click="isOpenPostSlider = false"
-  />
+  <div v-if="isMobile && isOpenPostSlider" class="fixed inset-0 bg-black/50 z-40" @click="isOpenPostSlider = false" />
 
   <!-- 侧栏容器 -->
   <div
-    class="h-full w-full overflow-hidden mobile-drawer"
-    :class="{
+    class="h-full w-full overflow-hidden mobile-drawer" :class="{
       // 移动端样式
       'fixed top-0 left-0 z-55 bg-background border-r shadow-lg': isMobile,
       'animate': isMobile && enableAnimation,
       // 桌面端样式
       'border-2 border-[#0000] border-dashed bg-gray/20 transition-colors': !isMobile,
       'border-gray-700 bg-gray-400/50 dark:border-gray-200 dark:bg-gray-500/50': !isMobile && dragover,
-    }"
-    :style="{
+    }" :style="{
       transform: isMobile && isOpenPostSlider ? 'translateX(0)'
         : isMobile && !isOpenPostSlider ? 'translateX(-100%)'
           : undefined,
-    }"
-    @dragover.prevent="dragover = true"
-    @dragleave.prevent="dragover = false"
-    @dragend="handleDragEnd"
+    }" @dragover.prevent="dragover = true" @dragleave.prevent="dragover = false" @dragend="handleDragEnd"
   >
     <nav
-      class="h-full flex flex-col transition-transform overflow-hidden"
-      :class="{ 'p-2': isMobile }"
-      @dragover="handleDragOver"
-      @drop.prevent="handleDrop(null)"
+      class="h-full flex flex-col transition-transform overflow-hidden" :class="{ 'p-2': isMobile }"
+      @dragover="handleDragOver" @drop.prevent="handleDrop(null)"
     >
       <!-- 移动端标题栏 -->
-      <div v-if="isMobile" class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b mb-2 bg-background">
+      <div
+        v-if="isMobile"
+        class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b mb-2 bg-background"
+      >
         <h2 class="text-lg font-semibold">
           内容管理
         </h2>
@@ -259,7 +251,7 @@ function handleDragEnd() {
         <!-- 新增 -->
         <Dialog v-model:open="isOpenAddDialog">
           <DialogTrigger>
-            <TooltipProvider :delay-duration="200">
+            <TooltipProvider :delay-duration="50">
               <Tooltip>
                 <TooltipTrigger as-child>
                   <Button variant="ghost" size="xs" class="h-max p-1">
@@ -272,7 +264,7 @@ function handleDragEnd() {
               </Tooltip>
             </TooltipProvider>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent class="top-[30%] translate-y-[-30%]">
             <DialogHeader>
               <DialogTitle>新增内容</DialogTitle>
               <DialogDescription>请输入内容名称</DialogDescription>
@@ -359,18 +351,11 @@ function handleDragEnd() {
       <div class="flex-1 overflow-y-auto space-y-1 px-1">
         <!-- 包裹根文章和子文章，保持间距 -->
         <PostItem
-          :parent-id="null"
-          :sorted-posts="sortedPosts"
-          :start-rename-post="startRenamePost"
-          :open-history-dialog="openHistoryDialog"
-          :start-del-post="startDelPost"
-          :drop-target-id="dropTargetId"
-          :set-drop-target-id="(id: string | null) => (dropTargetId = id)"
-          :drag-source-id="dragSourceId"
-          :set-drag-source-id="(id: string | null) => (dragSourceId = id)"
-          :handle-drop="handleDrop"
-          :handle-drag-end="handleDragEnd"
-          :open-add-post-dialog="openAddPostDialog"
+          :parent-id="null" :sorted-posts="sortedPosts" :start-rename-post="startRenamePost"
+          :open-history-dialog="openHistoryDialog" :start-del-post="startDelPost" :drop-target-id="dropTargetId"
+          :set-drop-target-id="(id: string | null) => (dropTargetId = id)" :drag-source-id="dragSourceId"
+          :set-drag-source-id="(id: string | null) => (dragSourceId = id)" :handle-drop="handleDrop"
+          :handle-drag-end="handleDragEnd" :open-add-post-dialog="openAddPostDialog"
         />
       </div>
     </nav>
@@ -423,8 +408,7 @@ function handleDragEnd() {
         <!-- 左侧时间轴 -->
         <ul class="space-y-1.5 w-[180px]">
           <li
-            v-for="(item, idx) in postStore.getPostById(currentPostId!)?.history"
-            :key="item.datetime"
+            v-for="(item, idx) in postStore.getPostById(currentPostId!)?.history" :key="item.datetime"
             class="min-h-[2.75rem] w-full inline-flex cursor-pointer items-center gap-2 rounded-md px-3 py-2.5 text-sm transition-colors leading-tight"
             :class="[
               // eslint-disable-next-line vue/prefer-separate-static-class
@@ -433,8 +417,7 @@ function handleDragEnd() {
                 'bg-primary text-primary-foreground shadow-sm':
                   currentHistoryIndex === idx,
               },
-            ]"
-            @click="currentHistoryIndex = idx"
+            ]" @click="currentHistoryIndex = idx"
           >
             <span class="break-words w-full">{{ item.datetime }}</span>
           </li>

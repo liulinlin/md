@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Copy, Menu, Palette } from 'lucide-vue-next'
+import { Copy, Menu, Palette, Trash2 } from 'lucide-vue-next'
 import { useEditorStore } from '@/stores/editor'
 import { useExportStore } from '@/stores/export'
 import { useRenderStore } from '@/stores/render'
@@ -34,6 +34,20 @@ function editorRefresh() {
 
   const raw = editorStore.getContent()
   renderStore.render(raw)
+}
+
+function confirmReset() {
+  if (!editor.value)
+    return
+
+  editor.value.dispatch({
+    changes: {
+      from: 0,
+      to: editor.value.state.doc.length,
+      insert: '',
+    },
+  })
+  editorRefresh()
 }
 
 // 对话框状态
@@ -232,9 +246,7 @@ function copyToWeChat() {
 </script>
 
 <template>
-  <header
-    class="header-container h-15 flex flex-wrap items-center justify-between px-5 relative"
-  >
+  <header class="header-container h-15 flex flex-wrap items-center justify-between px-5 relative">
     <!-- 桌面端左侧菜单 -->
     <div class="space-x-1 hidden md:flex">
       <Menubar class="menubar border-0">
@@ -272,12 +284,32 @@ function copyToWeChat() {
 
     <!-- 右侧操作区 -->
     <div class="flex flex-wrap items-center gap-2">
+      <!-- 清空按钮 -->
+      <AlertDialog>
+        <AlertDialogTrigger as-child>
+          <Button variant="outline" class="h-9 hover:text-red-500 hover:border-red-500">
+            <Trash2 class="mr-2 h-4 w-4" />
+            <span>清空</span>
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确定要清空全部内容吗？</AlertDialogTitle>
+            <AlertDialogDescription>
+              此操作将清空当前的编辑内容，且无法恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction @click="confirmReset">
+              确认
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <!-- 复制按钮 -->
-      <Button
-        variant="outline"
-        class="h-9"
-        @click="copyToWeChat"
-      >
+      <Button variant="outline" class="h-9" @click="copyToWeChat">
         <Copy class="mr-2 h-4 w-4" />
         <span>复制</span>
       </Button>
@@ -287,9 +319,7 @@ function copyToWeChat() {
 
       <!-- 样式面板 -->
       <Button
-        variant="outline"
-        class="h-9"
-        :class="{ 'bg-accent text-accent-foreground': isOpenRightSlider }"
+        variant="outline" class="h-9" :class="{ 'bg-accent text-accent-foreground': isOpenRightSlider }"
         @click="isOpenRightSlider = !isOpenRightSlider"
       >
         <Palette class="mr-2 h-4 w-4" />
@@ -397,6 +427,7 @@ kbd {
     opacity: 0;
     transform: translateY(-4px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
