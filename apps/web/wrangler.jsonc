@@ -32,6 +32,9 @@
   /**
    * Environment Variables
    * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
+   *
+   * RENDER_API_KEY: API key for /api/render endpoint authentication
+   * Set via: wrangler secret put RENDER_API_KEY
    */
   // "vars": { "MY_VARIABLE": "production_value" }
   /**

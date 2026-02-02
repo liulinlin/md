@@ -49,6 +49,7 @@ components.d.ts
 .output
 web-ext.config.ts
 .wrangler
+.dev.vars
 
 # vite-plugin-pwa dev output
 dev-dist
@@ -61,3 +62,5 @@ apps/utools/release
 apps/web/public/static/libs/mathjax
 apps/web/public/static/libs/mermaid
 apps/web/public/static/libs/article-syncjs
+#llm
+.claude/

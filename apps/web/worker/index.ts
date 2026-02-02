@@ -1,11 +1,30 @@
 import { WorkerEntrypoint } from 'cloudflare:workers'
+import { handleCORS, handleRender } from './render-api'
 
 const MP_HOST = `https://api.weixin.qq.com`
 
-export default class extends WorkerEntrypoint {
+interface Env {
+  RENDER_API_KEY?: string
+}
+
+export default class extends WorkerEntrypoint<Env> {
   async fetch(request: Request): Promise<Response> {
     // 1️⃣ 获取原请求 URL 与路径
     const url = new URL(request.url)
+
+    // 处理 /api/render 端点
+    if (url.pathname === `/api/render`) {
+      if (request.method === `OPTIONS`) {
+        return handleCORS()
+      }
+      if (request.method === `POST`) {
+        return handleRender(request, this.env.RENDER_API_KEY)
+      }
+      return new Response(JSON.stringify({ error: `Method not allowed` }), {
+        status: 405,
+        headers: { 'Content-Type': `application/json` },
+      })
+    }
 
     // 拼接转发目标，例如请求 /cgi-bin/stable_token 就会转发到
     // https://api.weixin.qq.com/cgi-bin/stable_token
