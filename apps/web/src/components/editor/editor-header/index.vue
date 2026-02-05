@@ -7,6 +7,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
 import { addPrefix, generatePureHTML, processClipboardContent } from '@/utils'
 import { store } from '@/utils/storage'
+import AuthButton from './AuthButton.vue'
 import EditDropdown from './EditDropdown.vue'
 import FileDropdown from './FileDropdown.vue'
 import FormatDropdown from './FormatDropdown.vue'
@@ -27,7 +28,6 @@ const { editor } = storeToRefs(editorStore)
 const { output } = storeToRefs(renderStore)
 const { primaryColor } = storeToRefs(themeStore)
 const { isOpenRightSlider } = storeToRefs(uiStore)
-
 // Editor refresh function
 function editorRefresh() {
   themeStore.updateCodeTheme()
@@ -257,6 +257,7 @@ function copyToWeChat() {
         <StyleDropdown />
         <ViewDropdown />
         <HelpDropdown @open-about="handleOpenAbout" @open-fund="handleOpenFund" />
+        <AuthButton />
       </Menubar>
     </div>
 

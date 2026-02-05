@@ -41,16 +41,6 @@ onMounted(() => {
   <Login v-if="!isAuthenticated" />
   <CodemirrorEditor v-else />
 
-  <!-- 退出按钮：仅当已认证且开启了认证功能时显示 -->
-  <div v-if="isAuthenticated && authStore.isAuthEnabled" class="fixed bottom-4 right-4 z-50">
-    <button
-      class="px-3 py-1 text-xs text-red-500 hover:bg-red-500/10 rounded border border-red-500/20 transition-colors opacity-50 hover:opacity-100 bg-background"
-      @click="authStore.logout"
-    >
-      退出登录
-    </button>
-  </div>
-
   <Toaster rich-colors position="top-center" :theme="isDark ? 'dark' : 'light'" />
 </template>
 

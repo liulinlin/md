@@ -8,20 +8,27 @@ import { useAuthStore } from '@/stores/auth'
 
 const username = ref('')
 const password = ref('')
+const isLoading = ref(false)
 const authStore = useAuthStore()
 
-function handleLogin() {
+async function handleLogin() {
   if (!username.value || !password.value) {
     toast.error('请输入用户名和密码')
     return
   }
 
-  const success = authStore.login(username.value, password.value)
-  if (success) {
-    toast.success('登录成功')
+  isLoading.value = true
+  try {
+    const success = await authStore.login(username.value, password.value)
+    if (success) {
+      toast.success('登录成功')
+    }
+    else {
+      toast.error('用户名或密码错误')
+    }
   }
-  else {
-    toast.error('用户名或密码错误')
+  finally {
+    isLoading.value = false
   }
 }
 </script>
@@ -44,6 +51,7 @@ function handleLogin() {
             v-model="username"
             placeholder="用户名"
             class="w-full"
+            :disabled="isLoading"
             @keyup.enter="handleLogin"
           />
         </div>
@@ -52,11 +60,13 @@ function handleLogin() {
             v-model="password"
             placeholder="密码"
             class="w-full"
+            :disabled="isLoading"
             @keyup.enter="handleLogin"
           />
         </div>
-        <Button class="w-full" @click="handleLogin">
-          进入编辑器
+        <Button class="w-full" :disabled="isLoading" @click="handleLogin">
+          <span v-if="isLoading">登录中...</span>
+          <span v-else>进入编辑器</span>
         </Button>
       </div>
     </div>
