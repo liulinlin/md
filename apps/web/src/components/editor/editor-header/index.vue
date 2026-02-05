@@ -278,6 +278,7 @@ function copyToWeChat() {
             <StyleDropdown :as-sub="true" />
             <ViewDropdown :as-sub="true" />
             <HelpDropdown :as-sub="true" @open-about="handleOpenAbout" @open-fund="handleOpenFund" />
+            <AuthButton :as-sub="true" />
           </MenubarContent>
         </MenubarMenu>
       </Menubar>
