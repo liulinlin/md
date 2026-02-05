@@ -265,6 +265,6 @@ export const defaultStyleConfig = {
   fontSize: fontSizeOptions[2].value,
   primaryColor: colorOptions[0].value,
   codeBlockTheme: codeBlockThemeOptions[23].value,
-  legend: legendOptions[3].value,
+  legend: legendOptions[4].value,
   headingStyles: defaultHeadingStyles as HeadingStyles,
 }
