@@ -297,6 +297,15 @@ function exportCurrentTheme() {
           >
             <Plus class="h-5 w-5" />
           </Button>
+          <Button
+            v-if="!isMobile"
+            variant="ghost"
+            size="icon"
+            class="h-9 w-9 shrink-0 hover:bg-accent"
+            @click="uiStore.isShowCssEditor = false"
+          >
+            <X class="h-5 w-5" />
+          </Button>
         </div>
       </Tabs>
       <!-- CSS编辑器内容区域 -->
