@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { Toaster } from '@/components/ui/sonner'
+import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import CodemirrorEditor from '@/views/CodemirrorEditor.vue'
+import Login from '@/views/Login.vue'
 
 const uiStore = useUIStore()
+const authStore = useAuthStore()
 const { isDark } = storeToRefs(uiStore)
+const { isAuthenticated } = storeToRefs(authStore)
 
 const isUtools = ref(false)
 
@@ -32,13 +36,22 @@ onMounted(() => {
 
 <template>
   <AppSplash />
-  <CodemirrorEditor />
 
-  <Toaster
-    rich-colors
-    position="top-center"
-    :theme="isDark ? 'dark' : 'light'"
-  />
+  <!-- 根据认证状态切换视图 -->
+  <Login v-if="!isAuthenticated" />
+  <CodemirrorEditor v-else />
+
+  <!-- 退出按钮：仅当已认证且开启了认证功能时显示 -->
+  <div v-if="isAuthenticated && authStore.isAuthEnabled" class="fixed bottom-4 right-4 z-50">
+    <button
+      class="px-3 py-1 text-xs text-red-500 hover:bg-red-500/10 rounded border border-red-500/20 transition-colors opacity-50 hover:opacity-100 bg-background"
+      @click="authStore.logout"
+    >
+      退出登录
+    </button>
+  </div>
+
+  <Toaster rich-colors position="top-center" :theme="isDark ? 'dark' : 'light'" />
 </template>
 
 <style lang="less">
@@ -118,14 +131,19 @@ body {
   &:first-of-type {
     margin-top: 0;
   }
+
   &:hover {
     background: #f0f0f0;
   }
 }
+
 .search-match {
-  background-color: #ffeb3b; /* 所有匹配项颜色 */
+  background-color: #ffeb3b;
+  /* 所有匹配项颜色 */
 }
+
 .current-match {
-  background-color: #ff5722; /* 当前匹配项更鲜艳的颜色 */
+  background-color: #ff5722;
+  /* 当前匹配项更鲜艳的颜色 */
 }
 </style>
