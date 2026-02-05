@@ -64,3 +64,4 @@ apps/web/public/static/libs/mermaid
 apps/web/public/static/libs/article-syncjs
 #llm
 .claude/
+apps/web/wrangler.jsonc

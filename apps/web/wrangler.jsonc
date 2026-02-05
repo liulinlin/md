@@ -17,6 +17,19 @@
   "compatibility_flags": [
     "nodejs_compat",
     "nodejs_compat_populate_process_env"
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "MD_KV",
+      "id": "71000fe4b29846b88d4d05cdfada34a6"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "MD_DB",
+      "database_name": "md-d1",
+      "database_id": "99a04147-6954-4f62-819a-db98bd94c5cc"
+    }
   ]
   /**
    * Smart Placement

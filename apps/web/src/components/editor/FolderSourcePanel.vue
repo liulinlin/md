@@ -16,7 +16,7 @@ import FolderTree from './FolderTree.vue'
 const folderSourceStore = useFolderSourceStore()
 const postStore = usePostStore()
 const { setCurrentFilePath } = useFolderFileSync()
-
+const uiStore = useUIStore()
 const {
   currentFolderHandle,
   fileTree,
@@ -91,40 +91,29 @@ async function handleOpenFile(node: any) {
           <FolderTreeIcon class="h-4 w-4" />
           本地文件夹
         </h3>
-        <Button
-          v-if="currentFolderHandle"
-          variant="ghost"
-          size="sm"
-          class="h-7 w-7 p-0"
-          @click="handleCloseFolder"
-        >
-          <X class="h-3 w-3" />
+        <Button variant="ghost" size="sm" @click="uiStore.isOpenFolderPanel = false">
+          <X class="h-4 w-4" />
         </Button>
       </div>
 
       <!-- 操作按钮 -->
       <div class="flex gap-1">
         <Button
-          variant="outline"
-          size="sm"
-          class="flex-1 text-xs"
-          :disabled="isLoading || !isFileSystemAPISupported"
+          variant="outline" size="sm" class="flex-1 text-xs" :disabled="isLoading || !isFileSystemAPISupported"
           @click="handleSelectFolder"
         >
           <FolderPlus v-if="!isLoading" class="h-3 w-3 mr-1" />
           <Loader2 v-else class="h-3 w-3 mr-1 animate-spin" />
           打开文件夹
         </Button>
-
         <Button
-          v-if="currentFolderHandle"
-          variant="outline"
-          size="sm"
-          class="text-xs"
-          :disabled="isLoading"
+          v-if="currentFolderHandle" variant="outline" size="sm" class="text-xs" :disabled="isLoading"
           @click="handleRefreshFolder"
         >
           <RefreshCw class="h-3 w-3" :class="{ 'animate-spin': isLoading }" />
+        </Button>
+        <Button v-if="currentFolderHandle" variant="outline" size="sm" class="text-xs" @click="handleCloseFolder">
+          <X class="h-3 w-3" />
         </Button>
       </div>
     </div>
@@ -146,10 +135,7 @@ async function handleOpenFile(node: any) {
       </div>
 
       <!-- 加载中 -->
-      <div
-        v-else-if="isLoading"
-        class="flex flex-col items-center justify-center h-full"
-      >
+      <div v-else-if="isLoading" class="flex flex-col items-center justify-center h-full">
         <Loader2 class="h-8 w-8 animate-spin text-primary" />
         <p class="text-sm text-muted-foreground mt-2">
           加载中...
@@ -186,11 +172,8 @@ async function handleOpenFile(node: any) {
           {{ currentFolderHandle.name }}
         </div>
         <FolderTree
-          :nodes="fileTree"
-          :selected-path="selectedFilePath"
-          :expanded-paths="expandedPaths"
-          @select="handleOpenFile"
-          @toggle-expand="handleToggleExpand"
+          :nodes="fileTree" :selected-path="selectedFilePath" :expanded-paths="expandedPaths"
+          @select="handleOpenFile" @toggle-expand="handleToggleExpand"
         />
       </div>
     </div>
