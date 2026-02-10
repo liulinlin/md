@@ -58,6 +58,7 @@ const postStore = usePostStore()
 const templateStore = useTemplateStore()
 const uiStore = useUIStore()
 const { posts, currentPostId } = storeToRefs(postStore)
+const { isMobile, isOpenPostSlider } = storeToRefs(uiStore)
 const { toggleShowTemplateDialog } = uiStore
 
 /* ============ 新增内容 ============ */
@@ -112,6 +113,13 @@ function applyTemplate(postId: string) {
   currentPostId.value = postId
   toggleShowTemplateDialog(true)
 }
+
+function handlePostItemClick(postId: string) {
+  currentPostId.value = postId
+  if (isMobile.value) {
+    isOpenPostSlider.value = false
+  }
+}
 </script>
 
 <template>
@@ -132,7 +140,7 @@ function applyTemplate(postId: string) {
         },
       ]" draggable="true" @dragstart="handleDragStart(post.id, $event)" @dragend="props.handleDragEnd"
       @drop.prevent="props.handleDrop(post.id)" @dragover.stop.prevent="props.setDropTargetId(post.id)"
-      @dragleave.prevent="props.setDropTargetId(null)" @click="currentPostId = post.id"
+      @dragleave.prevent="props.setDropTargetId(null)" @click="handlePostItemClick(post.id)"
     >
       <!-- 折叠展开图标 -->
       <Button
