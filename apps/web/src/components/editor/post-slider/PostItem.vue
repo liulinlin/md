@@ -155,7 +155,7 @@ function handlePostItemClick(postId: string) {
       <!-- 每条文章操作 -->
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
-          <Button size="xs" variant="ghost" class="ml-auto h-max p-0.5">
+          <Button size="xs" variant="ghost" class="ml-auto h-max p-0.5" @click.stop>
             <Ellipsis class="size-4" />
           </Button>
         </DropdownMenuTrigger>
