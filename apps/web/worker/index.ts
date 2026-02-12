@@ -1,5 +1,4 @@
 import { WorkerEntrypoint } from 'cloudflare:workers'
-import { handleCORS, handleRender } from './render-api'
 
 const MP_HOST = `https://api.weixin.qq.com`
 
@@ -64,20 +63,6 @@ export default class extends WorkerEntrypoint<Env> {
             headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
           })
         }
-      }
-      return new Response(JSON.stringify({ error: `Method not allowed` }), {
-        status: 405,
-        headers: { 'Content-Type': `application/json` },
-      })
-    }
-
-    // 处理 /api/render 端点
-    if (url.pathname === `/api/render`) {
-      if (request.method === `OPTIONS`) {
-        return handleCORS()
-      }
-      if (request.method === `POST`) {
-        return handleRender(request, this.env.RENDER_API_KEY)
       }
       return new Response(JSON.stringify({ error: `Method not allowed` }), {
         status: 405,
