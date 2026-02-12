@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Copy, Menu, Palette, Trash2 } from 'lucide-vue-next'
+import { Copy, FileText, Menu, Palette, Trash2 } from 'lucide-vue-next'
 import { useEditorStore } from '@/stores/editor'
 import { useExportStore } from '@/stores/export'
 import { useRenderStore } from '@/stores/render'
@@ -243,6 +243,11 @@ function copyToWeChat() {
   copyMode.value = 'txt'
   copy()
 }
+
+function copyToMarkdown() {
+  copyMode.value = 'md'
+  copy()
+}
 </script>
 
 <template>
@@ -289,9 +294,9 @@ function copyToWeChat() {
       <!-- 清空按钮 -->
       <AlertDialog>
         <AlertDialogTrigger as-child>
-          <Button variant="outline" class="h-9 hover:text-red-500 hover:border-red-500">
-            <Trash2 class="mr-2 h-4 w-4" />
-            <span>清空</span>
+          <Button variant="outline" class="h-8 px-2 text-xs hover:text-red-500 hover:border-red-500">
+            <Trash2 class="mr-1 h-3.5 w-3.5" />
+            <span class="hidden md:inline-flex">清空</span>
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent>
@@ -311,20 +316,23 @@ function copyToWeChat() {
       </AlertDialog>
 
       <!-- 复制按钮 -->
-      <Button variant="outline" class="h-9" @click="copyToWeChat">
-        <Copy class="mr-2 h-4 w-4" />
+      <Button variant="outline" class="h-8 px-2 text-xs" @click="copyToWeChat">
+        <Copy class="mr-1 h-3.5 w-3.5" />
         <span>复制</span>
       </Button>
 
-      <!-- 文章信息（移动端隐藏） -->
-      <PostInfo class="hidden md:inline-flex" />
+      <!-- 复制MD按钮 -->
+      <Button variant="outline" class="h-8 px-2 text-xs" @click="copyToMarkdown">
+        <FileText class="mr-1 h-3.5 w-3.5" />
+        <span>MD</span>
+      </Button>
 
       <!-- 样式面板 -->
       <Button
-        variant="outline" class="h-9" :class="{ 'bg-accent text-accent-foreground': isOpenRightSlider }"
+        variant="outline" class="h-8 px-2 text-xs" :class="{ 'bg-accent text-accent-foreground': isOpenRightSlider }"
         @click="isOpenRightSlider = !isOpenRightSlider"
       >
-        <Palette class="mr-2 h-4 w-4" />
+        <Palette class="mr-1 h-3.5 w-3.5" />
         <span>样式</span>
       </Button>
     </div>
@@ -416,9 +424,7 @@ kbd {
   font-weight: 600;
   line-height: 1;
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
-  box-shadow:
-    0 1px 0 hsl(var(--border)),
-    inset 0 0.5px 0 hsl(var(--background));
+  box-shadow: 0 1px 0 hsl(var(--border)), inset 0 0.5px 0 hsl(var(--background));
   transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   text-transform: uppercase;
   letter-spacing: 0.025em;
