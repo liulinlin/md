@@ -13,6 +13,7 @@ import FileDropdown from './FileDropdown.vue'
 import FormatDropdown from './FormatDropdown.vue'
 import HelpDropdown from './HelpDropdown.vue'
 import InsertDropdown from './InsertDropdown.vue'
+import PostDropdown from './PostDropdown.vue'
 import StyleDropdown from './StyleDropdown.vue'
 import ViewDropdown from './ViewDropdown.vue'
 
@@ -256,6 +257,7 @@ function copyToMarkdown() {
     <div class="space-x-1 hidden md:flex">
       <Menubar class="menubar border-0">
         <FileDropdown @open-editor-state="handleOpenEditorState" />
+        <PostDropdown />
         <EditDropdown @copy="handleCopy" />
         <FormatDropdown />
         <InsertDropdown />
@@ -277,6 +279,7 @@ function copyToMarkdown() {
           </MenubarTrigger>
           <MenubarContent align="start">
             <FileDropdown :as-sub="true" @open-editor-state="handleOpenEditorState" />
+            <PostDropdown :as-sub="true" />
             <EditDropdown :as-sub="true" @copy="handleCopy" />
             <FormatDropdown :as-sub="true" />
             <InsertDropdown :as-sub="true" />

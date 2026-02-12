@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { FileText, Globe, Loader2, Sparkles, Upload } from 'lucide-vue-next'
 import { useEditorStore } from '@/stores/editor'
+import { usePostStore } from '@/stores/post'
 import { useUIStore } from '@/stores/ui'
 
 const editorStore = useEditorStore()
+const postStore = usePostStore()
 const uiStore = useUIStore()
 
 const { isShowImportMdDialog } = storeToRefs(uiStore)
@@ -97,6 +99,20 @@ async function fetchViaAnythingMd(rawUrl: string, signal: AbortSignal): Promise<
   return markdown
 }
 
+/** 从内容中提取标题，优先取第一个一级标题 */
+function extractTitle(content: string): string {
+  const match = content.match(/^#\s+(.+)/m)
+  return match ? match[1].trim() : `导入的文档`
+}
+
+/** 创建新文章并导入内容 */
+async function importToNewPost(content: string) {
+  const title = extractTitle(content)
+  postStore.addPost(title)
+  await nextTick()
+  editorStore.importContent(content)
+}
+
 async function importFromUrl() {
   const rawUrl = url.value.trim()
   if (!rawUrl) {
@@ -127,7 +143,7 @@ async function importFromUrl() {
       content = await fetchViaAnythingMd(rawUrl, signal)
     }
 
-    editorStore.importContent(content)
+    await importToNewPost(content)
     closeDialog()
   }
   catch (err) {
@@ -188,7 +204,7 @@ async function readAndImportFiles(files: File[]) {
   const contents = await Promise.all(files.map(readFileAsText))
   const merged = contents.filter(c => c.trim()).join(`\n\n`)
   if (merged) {
-    editorStore.importContent(merged)
+    await importToNewPost(merged)
     closeDialog()
   }
 }
