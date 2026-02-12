@@ -9,6 +9,7 @@ import imageCompression from 'browser-image-compression'
 import { Eye, Pen } from 'lucide-vue-next'
 import { SidebarAIToolbar } from '@/components/ai'
 import FolderSourcePanel from '@/components/editor/FolderSourcePanel.vue'
+import PostManageDialogs from '@/components/editor/PostManageDialogs.vue'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -875,6 +876,8 @@ onUnmounted(() => {
       <ImportMarkdownDialog />
 
       <TemplateDialog />
+
+      <PostManageDialogs />
 
       <AlertDialog v-model:open="isOpenConfirmDialog">
         <AlertDialogContent>

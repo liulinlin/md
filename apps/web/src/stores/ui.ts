@@ -73,6 +73,14 @@ export const useUIStore = defineStore(`ui`, () => {
   const isShowTemplateDialog = ref(false)
   const toggleShowTemplateDialog = useToggle(isShowTemplateDialog)
 
+  // 是否展示新增内容对话框
+  const isShowAddPostDialog = ref(false)
+  const toggleShowAddPostDialog = useToggle(isShowAddPostDialog)
+
+  // 是否展示服务器文章管理对话框
+  const isShowServerListDialog = ref(false)
+  const toggleShowServerListDialog = useToggle(isShowServerListDialog)
+
   // 是否打开重置样式确认对话框
   const isOpenConfirmDialog = ref(false)
 
@@ -142,6 +150,10 @@ export const useUIStore = defineStore(`ui`, () => {
     importMdOpenUrl,
     isShowTemplateDialog,
     toggleShowTemplateDialog,
+    isShowAddPostDialog,
+    toggleShowAddPostDialog,
+    isShowServerListDialog,
+    toggleShowServerListDialog,
     isOpenConfirmDialog,
     aiDialogVisible,
     toggleAIDialog,
