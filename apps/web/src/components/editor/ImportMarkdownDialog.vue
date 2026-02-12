@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FileText, Globe, Loader2, Upload } from 'lucide-vue-next'
+import { FileText, Globe, Loader2, Sparkles, Upload } from 'lucide-vue-next'
 import { useEditorStore } from '@/stores/editor'
 import { useUIStore } from '@/stores/ui'
 
@@ -9,7 +9,7 @@ const uiStore = useUIStore()
 const { isShowImportMdDialog } = storeToRefs(uiStore)
 
 // 当前选中的 tab
-const activeTab = ref<'url' | 'file'>(`file`)
+const activeTab = ref<'url' | 'file' | 'jina'>(`file`)
 
 // ==================== 网络链接导入 ====================
 const url = ref(``)
@@ -18,6 +18,7 @@ const urlError = ref(``)
 let abortController: AbortController | null = null
 
 const ANYTHING_MD_API = `https://anything-md.doocs.org/`
+const JINA_READER_API = `https://r.jina.ai/`
 
 /** 判断链接是否直接指向 Markdown 文件 */
 function isMarkdownUrl(rawUrl: string): boolean {
@@ -40,6 +41,31 @@ async function fetchMarkdownFile(rawUrl: string, signal: AbortSignal): Promise<s
   if (!content.trim()) {
     throw new Error(`该链接返回的内容为空`)
   }
+  return content
+}
+
+/** 通过 Jina Reader 将网页转换为 Markdown */
+async function fetchViaJina(rawUrl: string, signal: AbortSignal): Promise<string> {
+  const response = await fetch(`${JINA_READER_API}${rawUrl}`, {
+    headers: {
+      'Authorization': `Bearer jina_b2a6bdbd297f4fc2bc890ace1e9dc896eFSHApz4Zu4M_uF5dYQeqFVEkNd-`,
+      'X-Md-Em-Delimiter': `*`,
+      'X-Engine': `browser`,
+      'X-Md-Heading-Style': `setext`,
+    },
+    signal,
+  })
+  if (!response.ok) {
+    throw new Error(`请求失败: ${response.status} ${response.statusText}`)
+  }
+  let content = await response.text()
+  if (!content.trim()) {
+    throw new Error(`该链接返回的内容为空`)
+  }
+
+  // 去除图片外层的跳转链接 [![...](image_url)](link_url) -> ![...](image_url)
+  content = content.replace(/\[!\[(.*?)\]\((.*?)\)\]\(.*?\)/g, '![$1]($2)')
+
   return content
 }
 
@@ -90,9 +116,16 @@ async function importFromUrl() {
   const { signal } = abortController
 
   try {
-    const content = isMarkdownUrl(rawUrl)
-      ? await fetchMarkdownFile(rawUrl, signal)
-      : await fetchViaAnythingMd(rawUrl, signal)
+    let content = ``
+    if (isMarkdownUrl(rawUrl)) {
+      content = await fetchMarkdownFile(rawUrl, signal)
+    }
+    else if (activeTab.value === `jina`) {
+      content = await fetchViaJina(rawUrl, signal)
+    }
+    else {
+      content = await fetchViaAnythingMd(rawUrl, signal)
+    }
 
     editorStore.importContent(content)
     closeDialog()
@@ -202,7 +235,7 @@ watch(isShowImportMdDialog, (visible) => {
       </DialogHeader>
 
       <Tabs v-model="activeTab" class="w-full">
-        <TabsList class="grid w-full grid-cols-2">
+        <TabsList class="grid w-full grid-cols-3">
           <TabsTrigger value="file">
             <span class="inline-flex items-center">
               <Upload class="mr-2 size-4 shrink-0" />
@@ -215,6 +248,12 @@ watch(isShowImportMdDialog, (visible) => {
               网络链接
             </span>
           </TabsTrigger>
+          <TabsTrigger value="jina">
+            <span class="inline-flex items-center">
+              <Sparkles class="mr-2 size-4 shrink-0" />
+              Jina 导入
+            </span>
+          </TabsTrigger>
         </TabsList>
 
         <!-- 本地文件导入 -->
@@ -224,10 +263,7 @@ watch(isShowImportMdDialog, (visible) => {
             :class="{
               'border-primary bg-primary/5': isDragover,
               'border-muted-foreground/25 hover:border-muted-foreground/50': !isDragover,
-            }"
-            @click="openFileDialog()"
-            @dragover.prevent="isDragover = true"
-            @dragleave.prevent="isDragover = false"
+            }" @click="openFileDialog()" @dragover.prevent="isDragover = true" @dragleave.prevent="isDragover = false"
             @drop="handleDrop"
           >
             <FileText class="mb-3 size-10 text-muted-foreground" />
@@ -245,11 +281,8 @@ watch(isShowImportMdDialog, (visible) => {
           <div class="space-y-4">
             <div class="space-y-2">
               <Input
-                v-model="url"
-                placeholder="如：https://mp.weixin.qq.com/s/xxxxx"
-                :class="{ 'border-destructive': urlError }"
-                @keydown.enter="importFromUrl"
-                @input="urlError = ``"
+                v-model="url" placeholder="如：https://mp.weixin.qq.com/s/xxxxx"
+                :class="{ 'border-destructive': urlError }" @keydown.enter="importFromUrl" @input="urlError = ``"
               />
               <p v-if="urlError" class="text-xs text-destructive">
                 {{ urlError }}
@@ -258,23 +291,39 @@ watch(isShowImportMdDialog, (visible) => {
                 支持 Markdown 文件链接直接导入，或网页链接自动转换
               </p>
             </div>
-            <Button
-              class="w-full"
-              :disabled="isUrlLoading || !url.trim()"
-              @click="importFromUrl"
-            >
+            <Button class="w-full" :disabled="isUrlLoading || !url.trim()" @click="importFromUrl">
               <Loader2 v-if="isUrlLoading" class="mr-2 size-4 animate-spin" />
               {{ isUrlLoading ? '导入中...' : '导入' }}
             </Button>
             <p class="text-center text-xs text-muted-foreground/60">
               基于
               <a
-                href="https://github.com/doocs/anything-md"
-                target="_blank"
+                href="https://github.com/doocs/anything-md" target="_blank"
                 class="underline hover:text-muted-foreground"
               >Anything-MD</a>
               提供转换服务
             </p>
+          </div>
+        </TabsContent>
+        <!-- jina 导入 -->
+        <TabsContent value="jina" class="mt-4">
+          <div class="space-y-4">
+            <div class="space-y-2">
+              <Input
+                v-model="url" placeholder="如：https://mp.weixin.qq.com/s/xxxxx"
+                :class="{ 'border-destructive': urlError }" @keydown.enter="importFromUrl" @input="urlError = ``"
+              />
+              <p v-if="urlError" class="text-xs text-destructive">
+                {{ urlError }}
+              </p>
+              <p v-else class="text-xs text-muted-foreground">
+                对接 Jina Reader 提供的 Markdown 转换服务，支持网页链接自动转换
+              </p>
+            </div>
+            <Button class="w-full" :disabled="isUrlLoading || !url.trim()" @click="importFromUrl">
+              <Loader2 v-if="isUrlLoading" class="mr-2 size-4 animate-spin" />
+              {{ isUrlLoading ? '导入中...' : '导入' }}
+            </Button>
           </div>
         </TabsContent>
       </Tabs>
