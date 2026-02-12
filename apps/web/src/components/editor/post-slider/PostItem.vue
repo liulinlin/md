@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   ChevronRight,
+  CloudUpload,
   Edit3,
   Ellipsis,
   FileInput,
@@ -52,6 +53,12 @@ const props = defineProps<{
   handleDragEnd: () => void
   // 以添加子文章的方式打开对话框
   openAddPostDialog: (parentId: string) => void
+  // 上传单篇文章到服务器
+  uploadPost: (postId: string) => void
+  // 是否已登录
+  isAuthenticated: boolean
+  // 是否正在上传
+  uploading: boolean
 }>()
 
 const postStore = usePostStore()
@@ -176,6 +183,10 @@ function handlePostItemClick(postId: string) {
           <DropdownMenuItem @click.stop="applyTemplate(post.id)">
             <FileInput class="mr-2 size-4" /> 应用模板
           </DropdownMenuItem>
+          <DropdownMenuSeparator v-if="props.isAuthenticated" />
+          <DropdownMenuItem v-if="props.isAuthenticated" :disabled="props.uploading" @click.stop="props.uploadPost(post.id)">
+            <CloudUpload class="mr-2 size-4" /> 上传到服务器
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem v-if="posts.length > 1" @click.stop="props.startDelPost(post.id)">
             <Trash2 class="mr-2 size-4" /> 删除
@@ -195,6 +206,7 @@ function handlePostItemClick(postId: string) {
         :drop-target-id="props.dropTargetId" :set-drop-target-id="props.setDropTargetId"
         :handle-drag-end="props.handleDragEnd" :handle-drop="props.handleDrop"
         :open-add-post-dialog="props.openAddPostDialog"
+        :upload-post="props.uploadPost" :is-authenticated="props.isAuthenticated" :uploading="props.uploading"
       />
     </div>
   </div>

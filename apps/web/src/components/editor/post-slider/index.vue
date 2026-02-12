@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { ArrowUpNarrowWide, ChevronsDownUp, ChevronsUpDown, PlusSquare, X } from 'lucide-vue-next'
+import { ArrowUpNarrowWide, ChevronsDownUp, ChevronsUpDown, CloudDownload, CloudUpload, PlusSquare, X } from 'lucide-vue-next'
+import { useCloudSync } from '@/composables/useCloudSync'
+import { useAuthStore } from '@/stores/auth'
 import { useEditorStore } from '@/stores/editor'
 import { usePostStore } from '@/stores/post'
 import { useUIStore } from '@/stores/ui'
@@ -14,6 +16,58 @@ const { posts } = storeToRefs(postStore)
 
 const editorStore = useEditorStore()
 const { editor } = storeToRefs(editorStore)
+
+const authStore = useAuthStore()
+const { isAuthenticated } = storeToRefs(authStore)
+
+/* ============ 云同步 ============ */
+const {
+  uploading,
+  loadingServerList,
+  serverPostList,
+  operatingIds,
+  uploadPost,
+  fetchServerPostList,
+  pullPost,
+  deleteServerPost,
+} = useCloudSync()
+const isOpenServerListDialog = ref(false)
+
+/** 打开服务器文章列表弹窗 */
+async function openServerListDialog() {
+  isOpenServerListDialog.value = true
+  await fetchServerPostList()
+}
+
+/** 拉取确认 */
+const pullTargetId = ref<string | null>(null)
+const isOpenPullConfirmDialog = ref(false)
+
+function confirmPullPost(id: string) {
+  pullTargetId.value = id
+  isOpenPullConfirmDialog.value = true
+}
+async function doPull() {
+  isOpenPullConfirmDialog.value = false
+  if (pullTargetId.value) {
+    await pullPost(pullTargetId.value)
+  }
+}
+
+/** 删除确认 */
+const deleteTargetId = ref<string | null>(null)
+const isOpenDeleteServerConfirmDialog = ref(false)
+
+function confirmDeleteServerPost(id: string) {
+  deleteTargetId.value = id
+  isOpenDeleteServerConfirmDialog.value = true
+}
+async function doDeleteServerPost() {
+  isOpenDeleteServerConfirmDialog.value = false
+  if (deleteTargetId.value) {
+    await deleteServerPost(deleteTargetId.value)
+  }
+}
 
 // 控制是否启用动画
 const enableAnimation = ref(false)
@@ -348,6 +402,34 @@ function handleDragEnd() {
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
+
+        <!-- 上传当前文章到服务器 -->
+        <TooltipProvider v-if="isAuthenticated" :delay-duration="200">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="ghost" size="xs" class="h-max p-1" :disabled="uploading" @click="uploadPost()">
+                <CloudUpload class="size-5" :class="{ 'animate-pulse': uploading }" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              上传当前文章
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <!-- 服务器文章管理 -->
+        <TooltipProvider v-if="isAuthenticated" :delay-duration="200">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="ghost" size="xs" class="h-max p-1" :disabled="loadingServerList" @click="openServerListDialog">
+                <CloudDownload class="size-5" :class="{ 'animate-pulse': loadingServerList }" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              服务器文章管理
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       <!-- 列表 -->
@@ -359,6 +441,7 @@ function handleDragEnd() {
           :set-drop-target-id="(id: string | null) => (dropTargetId = id)" :drag-source-id="dragSourceId"
           :set-drag-source-id="(id: string | null) => (dragSourceId = id)" :handle-drop="handleDrop"
           :handle-drag-end="handleDragEnd" :open-add-post-dialog="openAddPostDialog"
+          :upload-post="uploadPost" :is-authenticated="isAuthenticated" :uploading="uploading"
         />
       </div>
     </nav>
@@ -393,6 +476,99 @@ function handleDragEnd() {
       <AlertDialogFooter>
         <AlertDialogCancel>取消</AlertDialogCancel>
         <AlertDialogAction @click="delPost">
+          确定
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+
+  <!-- 服务器文章管理弹窗 -->
+  <Dialog v-model:open="isOpenServerListDialog">
+    <DialogContent class="sm:max-w-xl">
+      <DialogHeader>
+        <DialogTitle>服务器文章管理</DialogTitle>
+        <DialogDescription>查看服务器上的文章，可拉取到本地或从服务器删除</DialogDescription>
+      </DialogHeader>
+
+      <div class="max-h-[50vh] overflow-y-auto">
+        <!-- 加载中 -->
+        <div v-if="loadingServerList" class="flex items-center justify-center py-8 text-sm text-muted-foreground">
+          加载中...
+        </div>
+
+        <!-- 空状态 -->
+        <div v-else-if="serverPostList.length === 0" class="flex items-center justify-center py-8 text-sm text-muted-foreground">
+          服务器上暂无文章
+        </div>
+
+        <!-- 文章列表 -->
+        <div v-else class="space-y-2">
+          <div
+            v-for="item in serverPostList" :key="item.id"
+            class="flex items-center justify-between gap-2 rounded-md border p-3"
+          >
+            <div class="min-w-0 flex-1">
+              <div class="font-medium text-sm line-clamp-1">
+                {{ item.title }}
+              </div>
+              <div class="text-xs text-muted-foreground mt-0.5">
+                更新于 {{ new Date(item.updateDatetime).toLocaleString('zh-CN') }}
+              </div>
+            </div>
+            <div class="flex gap-1 shrink-0">
+              <Button
+                size="xs" variant="outline" class="text-xs"
+                :disabled="operatingIds.has(item.id)"
+                @click="confirmPullPost(item.id)"
+              >
+                拉取
+              </Button>
+              <Button
+                size="xs" variant="destructive" class="text-xs"
+                :disabled="operatingIds.has(item.id)"
+                @click="confirmDeleteServerPost(item.id)"
+              >
+                删除
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button variant="outline" :disabled="loadingServerList" @click="fetchServerPostList">
+          刷新
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+
+  <!-- 拉取确认 -->
+  <AlertDialog v-model:open="isOpenPullConfirmDialog">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>提示</AlertDialogTitle>
+        <AlertDialogDescription>此操作会将服务器文章拉取到本地（同 ID 文章将被覆盖），是否继续？</AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>取消</AlertDialogCancel>
+        <AlertDialogAction @click="doPull">
+          确定
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+
+  <!-- 删除服务器文章确认 -->
+  <AlertDialog v-model:open="isOpenDeleteServerConfirmDialog">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>提示</AlertDialogTitle>
+        <AlertDialogDescription>此操作将从服务器上永久删除该文章，是否继续？</AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>取消</AlertDialogCancel>
+        <AlertDialogAction @click="doDeleteServerPost">
           确定
         </AlertDialogAction>
       </AlertDialogFooter>
