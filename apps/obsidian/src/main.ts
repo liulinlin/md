@@ -5,6 +5,23 @@ import { WeChatPublisherSettingTab } from './settings/settings-tab'
 import { DEFAULT_SETTINGS, PREVIEW_VIEW_TYPE } from './types'
 import { PreviewView } from './views/preview-view'
 
+// MathJax stub: @md/core 的 KaTeX 扩展会调用 window.MathJax.texReset() / tex2svg()
+// Obsidian 环境可能已有 MathJax 配置对象但缺少运行时方法，直接补齐
+const mj = ((window as any).MathJax ??= {}) as Record<string, any>
+if (typeof mj.texReset !== 'function') {
+  mj.texReset = () => {}
+}
+if (typeof mj.tex2svg !== 'function') {
+  mj.tex2svg = (text: string, options?: { display?: boolean }) => {
+    const span = document.createElement('span')
+    span.style.cssText = 'font-family:monospace;font-size:0.9em;color:#555;'
+    span.textContent = options?.display ? `$$${text}$$` : `$${text}$`
+    const container = document.createElement('div')
+    container.appendChild(span)
+    return container
+  }
+}
+
 export default class WeChatPublisherPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS
 

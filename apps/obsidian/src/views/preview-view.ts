@@ -78,51 +78,61 @@ export class PreviewView extends ItemView {
     if (!activeFile || activeFile.extension !== 'md')
       return
 
-    const rawMarkdown = await this.app.vault.read(activeFile)
+    try {
+      const rawMarkdown = await this.app.vault.read(activeFile)
 
-    // 预处理 Obsidian 语法
-    const preprocessor = new ObsidianSyntaxPreprocessor(
-      this.app,
-      activeFile,
-      this.plugin.settings,
-    )
-    const markdown = await preprocessor.process(rawMarkdown)
+      // 预处理 Obsidian 语法
+      const preprocessor = new ObsidianSyntaxPreprocessor(
+        this.app,
+        activeFile,
+        this.plugin.settings,
+      )
+      const markdown = await preprocessor.process(rawMarkdown)
 
-    // 渲染 HTML
-    const renderer = initRenderer({
-      citeStatus: this.plugin.settings.citeStatus,
-      countStatus: this.plugin.settings.countStatus,
-      isMacCodeBlock: this.plugin.settings.isMacCodeBlock,
-      isShowLineNumber: this.plugin.settings.isShowLineNumber,
-      legend: this.plugin.settings.legend,
-    })
+      // 渲染 HTML
+      const renderer = initRenderer({
+        citeStatus: this.plugin.settings.citeStatus,
+        countStatus: this.plugin.settings.countStatus,
+        isMacCodeBlock: this.plugin.settings.isMacCodeBlock,
+        isShowLineNumber: this.plugin.settings.isShowLineNumber,
+        legend: this.plugin.settings.legend,
+      })
 
-    const html = modifyHtmlContent(markdown, renderer)
+      const html = modifyHtmlContent(markdown, renderer)
 
-    // 组装 CSS
-    const variables = generateCSSVariables({
-      primaryColor: this.plugin.settings.primaryColor,
-      fontFamily: this.plugin.settings.fontFamily,
-      fontSize: this.plugin.settings.fontSize,
-      isUseIndent: this.plugin.settings.isUseIndent,
-      isUseJustify: this.plugin.settings.isUseJustify,
-    })
+      // 组装 CSS
+      const variables = generateCSSVariables({
+        primaryColor: this.plugin.settings.primaryColor,
+        fontFamily: this.plugin.settings.fontFamily,
+        fontSize: this.plugin.settings.fontSize,
+        isUseIndent: this.plugin.settings.isUseIndent,
+        isUseJustify: this.plugin.settings.isUseJustify,
+      })
 
-    const themeCSS = themeMap[this.plugin.settings.theme as ThemeName]
-    const css = `${variables}\n${baseCSSContent}\n${themeCSS}\n${this.plugin.settings.customCSS}`
+      const themeCSS = themeMap[this.plugin.settings.theme as ThemeName]
+      const css = `${variables}\n${baseCSSContent}\n${themeCSS}\n${this.plugin.settings.customCSS}`
 
-    this.lastHtml = html
-    this.lastCss = css
+      this.lastHtml = html
+      this.lastCss = css
 
-    // 注入到预览区域
-    this.previewEl.empty()
+      // 注入到预览区域
+      this.previewEl.empty()
 
-    const styleEl = document.createElement('style')
-    styleEl.textContent = css
-    this.previewEl.appendChild(styleEl)
+      const styleEl = document.createElement('style')
+      styleEl.textContent = css
+      this.previewEl.appendChild(styleEl)
 
-    const outputEl = this.previewEl.createDiv({ attr: { id: 'output' } })
-    outputEl.innerHTML = html
+      const outputEl = this.previewEl.createDiv({ attr: { id: 'output' } })
+      outputEl.innerHTML = html
+    }
+    catch (err) {
+      console.error('[WeChat Publisher] Render error:', err)
+      this.previewEl.empty()
+      const errorEl = this.previewEl.createDiv({ cls: 'wechat-publisher-error' })
+      errorEl.style.cssText = 'padding:16px;color:#dc2626;font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;'
+      const error = err instanceof Error ? err : new Error(String(err))
+      errorEl.textContent = `渲染失败:\n\n${error.message}\n\n${error.stack || ''}`
+    }
   }
 
   private async handleCopy(): Promise<void> {
