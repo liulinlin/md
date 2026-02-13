@@ -8,12 +8,14 @@ import { baseCSSContent, themeMap } from '@md/shared/configs'
 import { ItemView, Notice } from 'obsidian'
 import { copyToClipboard, inlineCSS } from '../core/clipboard'
 import { ObsidianSyntaxPreprocessor } from '../core/preprocessor'
+import { publish } from '../core/wechat-publisher'
 import { ensureMathJax } from '../main'
 import { PREVIEW_VIEW_TYPE } from '../types'
-
+/* eslint-disable no-new */
 export class PreviewView extends ItemView {
   plugin: WeChatPublisherPlugin
   private previewEl!: HTMLElement
+  private pushBtn!: HTMLButtonElement
   private lastHtml = ''
   private lastCss = ''
 
@@ -47,6 +49,11 @@ export class PreviewView extends ItemView {
 
     const refreshBtn = toolbar.createEl('button', { text: '刷新' })
     refreshBtn.addEventListener('click', () => this.updatePreview())
+
+    // 推送按钮（配置不完整时隐藏）
+    this.pushBtn = toolbar.createEl('button', { text: '推送' })
+    this.pushBtn.addEventListener('click', () => this.handlePush())
+    this.updatePushBtnVisibility()
 
     // 预览区域
     const previewWrapper = container.createDiv({ cls: 'wechat-publisher-preview' })
@@ -139,9 +146,53 @@ export class PreviewView extends ItemView {
     }
   }
 
+  updatePushBtnVisibility(): void {
+    if (!this.pushBtn)
+      return
+    const { wxProxyUrl, wxAppId } = this.plugin.settings
+    this.pushBtn.style.display = (wxProxyUrl && wxAppId) ? '' : 'none'
+  }
+
+  async handlePush(): Promise<void> {
+    const activeFile = this.app.workspace.getActiveFile()
+    if (!activeFile || activeFile.extension !== 'md') {
+      new Notice('请先打开一个 Markdown 文件', 1500)
+      return
+    }
+
+    if (!this.lastHtml) {
+      new Notice('没有可推送的内容，请先刷新预览', 1500)
+      return
+    }
+
+    const { wxProxyUrl, wxAppId, wxAppSecret } = this.plugin.settings
+    if (!wxProxyUrl || !wxAppId || !wxAppSecret) {
+      new Notice('请先在插件设置中配置微信公众号推送参数', 3000)
+      return
+    }
+
+    new Notice('正在推送到微信草稿箱...', 2000)
+
+    try {
+      const result = await publish(
+        this.app,
+        this.plugin.settings,
+        this.lastHtml,
+        this.lastCss,
+        activeFile.basename,
+        activeFile,
+      )
+      new Notice(`推送成功！草稿 media_id: ${result.mediaId}`, 5000)
+    }
+    catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('[WeChat Publisher] Push failed:', err)
+      new Notice(`推送失败: ${msg}`, 5000)
+    }
+  }
+
   private async handleCopy(): Promise<void> {
     if (!this.lastHtml) {
-      /* eslint-disable no-new */
       new Notice('没有可复制的内容', 1500)
       return
     }

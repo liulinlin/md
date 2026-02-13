@@ -2,8 +2,9 @@ import type { ThemeName } from '@md/shared/configs'
 import type { App } from 'obsidian'
 import type WeChatPublisherPlugin from '../main'
 import { colorOptions, fontFamilyOptions, fontSizeOptions, legendOptions, themeOptions } from '@md/shared/configs'
-import { PluginSettingTab, Setting } from 'obsidian'
-
+import { Notice, PluginSettingTab, Setting } from 'obsidian'
+import { clearTokenCache, wxGetToken } from '../core/wechat-api'
+/* eslint-disable no-new */
 export class WeChatPublisherSettingTab extends PluginSettingTab {
   plugin: WeChatPublisherPlugin
 
@@ -186,6 +187,90 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
         text.onChange(async (value) => {
           this.plugin.settings.customCSS = value
           await this.plugin.saveSettings()
+        })
+      })
+
+    // 微信公众号推送
+    containerEl.createEl('h3', { text: '微信公众号推送' })
+
+    new Setting(containerEl)
+      .setName('代理服务器地址')
+      .setDesc('部署 apps/web 中的 Cloudflare Worker 后填入 URL，例如 https://your-worker.workers.dev')
+      .addText((text) => {
+        text.setPlaceholder('https://your-worker.workers.dev')
+        text.setValue(this.plugin.settings.wxProxyUrl)
+        text.onChange(async (value) => {
+          this.plugin.settings.wxProxyUrl = value.replace(/\/+$/, '')
+          clearTokenCache()
+          await this.plugin.saveSettings()
+        })
+      })
+
+    new Setting(containerEl)
+      .setName('AppID')
+      .setDesc('公众号后台 → 开发 → 基本配置')
+      .addText((text) => {
+        text.setPlaceholder('wx...')
+        text.setValue(this.plugin.settings.wxAppId)
+        text.onChange(async (value) => {
+          this.plugin.settings.wxAppId = value.trim()
+          clearTokenCache()
+          await this.plugin.saveSettings()
+        })
+      })
+
+    new Setting(containerEl)
+      .setName('AppSecret')
+      .setDesc('公众号后台 → 开发 → 基本配置')
+      .addText((text) => {
+        text.inputEl.type = 'password'
+        text.setPlaceholder('输入 AppSecret')
+        text.setValue(this.plugin.settings.wxAppSecret)
+        text.onChange(async (value) => {
+          this.plugin.settings.wxAppSecret = value.trim()
+          clearTokenCache()
+          await this.plugin.saveSettings()
+        })
+      })
+
+    new Setting(containerEl)
+      .setName('默认作者')
+      .setDesc('文章默认作者名，可在 frontmatter 中用 author 字段覆盖')
+      .addText((text) => {
+        text.setPlaceholder('作者名')
+        text.setValue(this.plugin.settings.wxDefaultAuthor)
+        text.onChange(async (value) => {
+          this.plugin.settings.wxDefaultAuthor = value
+          await this.plugin.saveSettings()
+        })
+      })
+
+    new Setting(containerEl)
+      .setName('测试连接')
+      .setDesc('验证代理地址和 AppID/AppSecret 是否正确')
+      .addButton((btn) => {
+        btn.setButtonText('测试')
+        btn.onClick(async () => {
+          const { wxProxyUrl, wxAppId, wxAppSecret } = this.plugin.settings
+          if (!wxProxyUrl || !wxAppId || !wxAppSecret) {
+            new Notice('请先填写代理地址、AppID 和 AppSecret')
+            return
+          }
+          btn.setButtonText('测试中...')
+          btn.setDisabled(true)
+          try {
+            clearTokenCache()
+            await wxGetToken(wxProxyUrl, wxAppId, wxAppSecret)
+            new Notice('连接成功，access_token 获取正常')
+          }
+          catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            new Notice(`连接失败: ${msg}`, 5000)
+          }
+          finally {
+            btn.setButtonText('测试')
+            btn.setDisabled(false)
+          }
         })
       })
   }

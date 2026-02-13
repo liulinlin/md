@@ -123,6 +123,13 @@ export default class WeChatPublisherPlugin extends Plugin {
       callback: () => this.copyCurrentFile(),
     })
 
+    // 注册命令：推送到微信草稿箱
+    this.addCommand({
+      id: 'push-wechat',
+      name: '推送到微信公众号草稿箱',
+      callback: () => this.pushToWechat(),
+    })
+
     // 注册设置面板
     this.addSettingTab(new WeChatPublisherSettingTab(this.app, this))
 
@@ -149,6 +156,7 @@ export default class WeChatPublisherPlugin extends Plugin {
       const view = leaf.view as PreviewView
       if (view?.updatePreview) {
         view.updatePreview()
+        view.updatePushBtnVisibility()
       }
     }
   }
@@ -190,6 +198,20 @@ export default class WeChatPublisherPlugin extends Plugin {
         // 触发工具栏的复制按钮逻辑
         const copyBtn = view.containerEl.querySelector('.wechat-publisher-toolbar button') as HTMLButtonElement
         copyBtn?.click()
+      }
+    }
+  }
+
+  private async pushToWechat(): Promise<void> {
+    // 确保预览面板已打开并渲染
+    await this.activatePreview()
+
+    const leaves = this.app.workspace.getLeavesOfType(PREVIEW_VIEW_TYPE)
+    if (leaves.length > 0) {
+      const view = leaves[0].view as PreviewView
+      if (view?.updatePreview) {
+        await view.updatePreview()
+        await view.handlePush()
       }
     }
   }

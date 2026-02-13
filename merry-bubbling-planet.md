@@ -106,3 +106,25 @@ wxDefaultAuthor: string // 默认 ''
 4. 打开一篇含图片的 Markdown 文件，打开预览面板
 5. 点击"推送"按钮，检查微信公众号后台草稿箱是否出现文章
 6. 验证图片正确显示、CSS 样式保留
+
+## 用固定 IP 服务器做代理
+
+如果需要使用固定 IP 服务器做代理，可以使用 Nginx 作为反向代理服务器，配置示例如下：
+需要将 `wx-proxy.yourdomain.com` 替换为你的域名，并将证书路径替换为实际路径。
+将 IP 写入到微信公众平台的 IP 白名单中。
+
+```nginx
+server {
+      listen 443 ssl;
+      server_name wx-proxy.yourdomain.com;
+
+      ssl_certificate     /path/to/cert.pem;
+      ssl_certificate_key /path/to/key.pem;
+
+      location / {
+          proxy_pass https://api.weixin.qq.com;
+          proxy_set_header Host api.weixin.qq.com;
+          proxy_ssl_server_name on;
+      }
+  }
+```

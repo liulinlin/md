@@ -25,6 +25,12 @@ export interface PluginSettings {
 
   // 自定义 CSS
   customCSS: string
+
+  // 微信公众号推送
+  wxAppId: string
+  wxAppSecret: string
+  wxProxyUrl: string
+  wxDefaultAuthor: string
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -46,6 +52,11 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   removeTags: false,
 
   customCSS: '',
+
+  wxAppId: '',
+  wxAppSecret: '',
+  wxProxyUrl: '',
+  wxDefaultAuthor: '',
 }
 
 export const PREVIEW_VIEW_TYPE = 'wechat-publisher-preview'
