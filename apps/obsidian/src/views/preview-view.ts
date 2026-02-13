@@ -8,6 +8,7 @@ import { baseCSSContent, themeMap } from '@md/shared/configs'
 import { ItemView, Notice } from 'obsidian'
 import { copyToClipboard, inlineCSS } from '../core/clipboard'
 import { ObsidianSyntaxPreprocessor } from '../core/preprocessor'
+import { ensureMathJax } from '../main'
 import { PREVIEW_VIEW_TYPE } from '../types'
 
 export class PreviewView extends ItemView {
@@ -88,6 +89,9 @@ export class PreviewView extends ItemView {
         this.plugin.settings,
       )
       const markdown = await preprocessor.process(rawMarkdown)
+
+      // 确保 MathJax 运行时未被 Obsidian 覆盖
+      ensureMathJax()
 
       // 渲染 HTML
       const renderer = initRenderer({

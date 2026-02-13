@@ -7,6 +7,9 @@ import { PreviewView } from './views/preview-view'
 
 const MATHJAX_CDN = 'https://cdn-doocs.oss-cn-shenzhen.aliyuncs.com/npm/mathjax@3/es5/tex-svg.js'
 
+/** 保存 MathJax 完整运行时引用，防止被 Obsidian 或其他插件覆盖 */
+let mathJaxRuntime: any = null
+
 /**
  * 动态加载 MathJax 3 运行时
  * @md/core 的 KaTeX 扩展依赖 window.MathJax.texReset() / tex2svg()
@@ -48,15 +51,32 @@ async function loadMathJax(): Promise<void> {
   // 验证运行时方法确实可用，否则抛出让 catch 安装降级 stub
   if (typeof (window as any).MathJax?.tex2svg !== 'function')
     throw new Error('MathJax loaded but tex2svg is not available')
+
+  // 保存完整运行时引用
+  mathJaxRuntime = (window as any).MathJax
+}
+
+/**
+ * 确保 MathJax 运行时可用
+ * Obsidian 切换文档时可能将 window.MathJax 重置为纯配置对象，
+ * 导致 @md/core 的 katex 扩展调用 texReset()/tex2svg() 时报错。
+ * 每次渲染前调用此函数，从保存的引用恢复运行时。
+ */
+export function ensureMathJax(): void {
+  if (typeof (window as any).MathJax?.tex2svg === 'function')
+    return
+  if (mathJaxRuntime) {
+    ;(window as any).MathJax = mathJaxRuntime
+  }
 }
 
 /** MathJax 加载失败时的降级 stub */
 function installMathJaxFallback(): void {
   const mj = ((window as any).MathJax ??= {}) as Record<string, any>
-  if (typeof mj.texReset !== 'function') {
+  if (typeof mj?.texReset !== 'function') {
     mj.texReset = () => {}
   }
-  if (typeof mj.tex2svg !== 'function') {
+  if (typeof mj?.tex2svg !== 'function') {
     mj.tex2svg = (text: string, options?: { display?: boolean }) => {
       const span = document.createElement('span')
       span.style.cssText = 'font-family:monospace;font-size:0.9em;color:#555;'
