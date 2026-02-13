@@ -17,6 +17,12 @@ async function loadMathJax(): Promise<void> {
   if (typeof (window as any).MathJax?.tex2svg === 'function')
     return
 
+  // 插件重载时 script 标签可能残留在 DOM 中，但 window.MathJax 已被覆盖丢失运行时方法
+  // 必须移除旧标签，重新注入以触发 MathJax 初始化
+  const existingScript = document.getElementById('MathJax-script')
+  if (existingScript)
+    existingScript.remove()
+
   // 合并已有配置（Obsidian 可能已设置 MathJax 配置对象）
   const existing = (window as any).MathJax || {}
   ;(window as any).MathJax = {
@@ -26,20 +32,22 @@ async function loadMathJax(): Promise<void> {
   }
 
   // 注入 script 标签加载 CDN
-  if (!document.getElementById('MathJax-script')) {
-    await new Promise<void>((resolve, reject) => {
-      const script = document.createElement('script')
-      script.id = 'MathJax-script'
-      script.src = MATHJAX_CDN
-      script.async = true
-      script.onload = () => resolve()
-      script.onerror = () => reject(new Error('Failed to load MathJax from CDN'))
-      document.head.appendChild(script)
-    })
-  }
+  await new Promise<void>((resolve, reject) => {
+    const script = document.createElement('script')
+    script.id = 'MathJax-script'
+    script.src = MATHJAX_CDN
+    script.async = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Failed to load MathJax from CDN'))
+    document.head.appendChild(script)
+  })
 
   // 等待 MathJax 完成内部初始化
   await (window as any).MathJax?.startup?.promise
+
+  // 验证运行时方法确实可用，否则抛出让 catch 安装降级 stub
+  if (typeof (window as any).MathJax?.tex2svg !== 'function')
+    throw new Error('MathJax loaded but tex2svg is not available')
 }
 
 /** MathJax 加载失败时的降级 stub */

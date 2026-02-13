@@ -1,20 +1,17 @@
 {
   "extends": "../../packages/config/tsconfig.base.json",
   "compilerOptions": {
+    "composite": false,
     "target": "ES2021",
     "lib": ["ES2021", "DOM"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "paths": {
-      "@md/core/*": ["../../packages/core/src/*"],
-      "@md/shared/*": ["../../packages/shared/src/*"]
-    },
     "types": ["node"],
     "noEmit": true,
     "outDir": "./dist",
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "../../packages/shared/src/global.d.ts"],
   "exclude": ["node_modules"]
 }
