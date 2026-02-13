@@ -5,20 +5,58 @@ import { WeChatPublisherSettingTab } from './settings/settings-tab'
 import { DEFAULT_SETTINGS, PREVIEW_VIEW_TYPE } from './types'
 import { PreviewView } from './views/preview-view'
 
-// MathJax stub: @md/core 的 KaTeX 扩展会调用 window.MathJax.texReset() / tex2svg()
-// Obsidian 环境可能已有 MathJax 配置对象但缺少运行时方法，直接补齐
-const mj = ((window as any).MathJax ??= {}) as Record<string, any>
-if (typeof mj.texReset !== 'function') {
-  mj.texReset = () => {}
+const MATHJAX_CDN = 'https://cdn-doocs.oss-cn-shenzhen.aliyuncs.com/npm/mathjax@3/es5/tex-svg.js'
+
+/**
+ * 动态加载 MathJax 3 运行时
+ * @md/core 的 KaTeX 扩展依赖 window.MathJax.texReset() / tex2svg()
+ * Web 端通过 <script> 标签加载，Obsidian 环境需要动态注入
+ */
+async function loadMathJax(): Promise<void> {
+  // 已有完整运行时，无需重复加载
+  if (typeof (window as any).MathJax?.tex2svg === 'function')
+    return
+
+  // 合并已有配置（Obsidian 可能已设置 MathJax 配置对象）
+  const existing = (window as any).MathJax || {}
+  ;(window as any).MathJax = {
+    ...existing,
+    tex: { tags: 'ams', ...existing.tex },
+    svg: { fontCache: 'none', ...existing.svg },
+  }
+
+  // 注入 script 标签加载 CDN
+  if (!document.getElementById('MathJax-script')) {
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script')
+      script.id = 'MathJax-script'
+      script.src = MATHJAX_CDN
+      script.async = true
+      script.onload = () => resolve()
+      script.onerror = () => reject(new Error('Failed to load MathJax from CDN'))
+      document.head.appendChild(script)
+    })
+  }
+
+  // 等待 MathJax 完成内部初始化
+  await (window as any).MathJax?.startup?.promise
 }
-if (typeof mj.tex2svg !== 'function') {
-  mj.tex2svg = (text: string, options?: { display?: boolean }) => {
-    const span = document.createElement('span')
-    span.style.cssText = 'font-family:monospace;font-size:0.9em;color:#555;'
-    span.textContent = options?.display ? `$$${text}$$` : `$${text}$`
-    const container = document.createElement('div')
-    container.appendChild(span)
-    return container
+
+/** MathJax 加载失败时的降级 stub */
+function installMathJaxFallback(): void {
+  const mj = ((window as any).MathJax ??= {}) as Record<string, any>
+  if (typeof mj.texReset !== 'function') {
+    mj.texReset = () => {}
+  }
+  if (typeof mj.tex2svg !== 'function') {
+    mj.tex2svg = (text: string, options?: { display?: boolean }) => {
+      const span = document.createElement('span')
+      span.style.cssText = 'font-family:monospace;font-size:0.9em;color:#555;'
+      span.textContent = options?.display ? `$$${text}$$` : `$${text}$`
+      const container = document.createElement('div')
+      container.appendChild(span)
+      return container
+    }
   }
 }
 
@@ -26,6 +64,15 @@ export default class WeChatPublisherPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS
 
   async onload(): Promise<void> {
+    // 优先加载 MathJax 运行时，失败则降级为纯文本显示
+    try {
+      await loadMathJax()
+    }
+    catch (err) {
+      console.warn('[WeChat Publisher] MathJax 加载失败，公式将降级显示:', err)
+      installMathJaxFallback()
+    }
+
     await this.loadSettings()
 
     // 注册预览视图

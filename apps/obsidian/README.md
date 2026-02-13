@@ -2,7 +2,7 @@
 
 > 将现有的 Markdown 转微信公众号排版功能移植到 Obsidian 插件
 >
-> 文档版本：v1.1（基于项目源码审查优化）
+> 文档版本：v1.2（补充开发踩坑记录及实际修复方案）
 > 最后更新：2026-02-13
 
 ---
@@ -29,13 +29,15 @@
 
 ### 1.2 关键挑战
 
-| 挑战                  | 影响 | 解决方案                                                                           |
-| --------------------- | ---- | ---------------------------------------------------------------------------------- |
-| Obsidian 特有语法处理 | 中   | 仅需处理 `[[wikilink]]`、`![[embed]]`、`%%注释%%`；Callout 已由 `markedAlert` 支持 |
-| MathJax 脚本加载      | 中   | `@md/core` 的 KaTeX 扩展依赖 `window.MathJax`，需在 Webview 中注入 CDN 脚本        |
-| 图片路径处理          | 中   | 集成图床上传或转换为 base64，利用 Obsidian Vault API 读取本地图片                  |
-| 移动端性能            | 低   | 禁用 Mermaid/Infographic 重度扩展                                                  |
-| CSS 作用域            | 低   | `ThemeInjector` 注入 `<style>` 到 `document.head`，需确认 Obsidian Webview 隔离性  |
+| 挑战                  | 影响 | 解决方案                                                                                                                                                                                                            |
+| --------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Obsidian 特有语法处理 | 中   | 仅需处理 `[[wikilink]]`、`![[embed]]`、`%%注释%%`；Callout 已由 `markedAlert` 支持                                                                                                                                  |
+| MathJax 脚本加载      | 中   | `@md/core` 的 KaTeX 扩展依赖 `window.MathJax.texReset()` / `tex2svg()`，Obsidian 环境可能已有 MathJax 配置对象但缺少运行时方法，需在插件 `onload()` 中动态注入 CDN 脚本并等待初始化完成，加载失败时降级为纯文本显示 |
+| 图片路径处理          | 中   | 集成图床上传或转换为 base64，利用 Obsidian Vault API 读取本地图片                                                                                                                                                   |
+| `@md/shared` 导入路径 | 高   | 必须使用子路径导入 `@md/shared/configs` 而非 `@md/shared`，否则会拉入 CodeMirror 编辑器依赖导致插件加载失败                                                                                                         |
+| npm 包可用性          | 低   | `@types/obsidian` 不存在于 npm，类型由 `obsidian` 包自带；`@types/node` 应继承 workspace 根配置避免信任策略冲突                                                                                                     |
+| 移动端性能            | 低   | 禁用 Mermaid/Infographic 重度扩展                                                                                                                                                                                   |
+| CSS 作用域            | 低   | `ThemeInjector` 注入 `<style>` 到 `document.head`，需确认 Obsidian Webview 隔离性                                                                                                                                   |
 
 ---
 
@@ -77,24 +79,38 @@ apps/obsidian/                    # 新增插件目录
     "@md/core": "workspace:*", // 核心渲染引擎（initRenderer, modifyHtmlContent, generateCSSVariables）
     "@md/shared": "workspace:*", // 共享配置（themeMap, baseCSSContent, colorOptions 等）
     "isomorphic-dompurify": "^2.35.0", // @md/core 的 peer dependency，XSS 清洗
-    "juice": "^10.0.0" // CSS 内联（复制到微信时使用）
+    "juice": "^11.0.3" // CSS 内联（复制到微信时使用）
   },
   "devDependencies": {
-    "@types/node": "^20.14.9",
-    "@types/obsidian": "^1.7.2",
     "builtin-modules": "^4.0.0", // esbuild external 配置需要
+    "cross-env": "^7.0.3", // 开发模式注入 OBSIDIAN_VAULT_PATH 环境变量
     "esbuild": "^0.23.1",
-    "obsidian": "latest",
+    "obsidian": "latest", // 类型定义由此包自带，无需 @types/obsidian
     "typescript": "^5.9.0"
   }
 }
 ```
+
+> **⚠️ 依赖踩坑记录**：
+>
+> - `@types/obsidian` 不存在于 npm，类型定义由 `obsidian` 包自带
+> - `@types/node` 不要显式声明，应继承 workspace 根配置，否则可能触发 pnpm 信任策略冲突（`ERR_PNPM_TRUST_DOWNGRADE`）
+> - **导入路径必须使用子路径** `@md/shared/configs` 而非 `@md/shared`，后者会拉入 CodeMirror 编辑器相关依赖（`@codemirror/lang-css` 等），导致打包产物膨胀且插件加载失败
 
 ### 2.3 渲染流程
 
 > 基于 `@md/core` 实际 API（参考 `apps/vscode/src/extension.ts` 集成模式）。
 
 ```
+插件加载（onload）
+    ↓
+动态加载 MathJax 3 运行时（CDN）
+    ├── 检测 window.MathJax.tex2svg 是否已存在
+    ├── 合并已有配置（Obsidian 可能已设置 MathJax 配置对象）
+    ├── 注入 <script> 加载 tex-svg.js
+    ├── 等待 MathJax.startup.promise 完成初始化
+    └── 失败时安装降级 stub（公式显示为原始文本）
+    ↓
 用户触发（打开预览 / 文档变更）
     ↓
 预处理 Obsidian 语法
@@ -173,9 +189,9 @@ modifyHtmlContent(markdown, renderer)
 ```
 1. CSS Variables    — generateCSSVariables({ primaryColor, fontFamily, fontSize, ... })
        ↓
-2. Base CSS         — baseCSSContent（from @md/shared，全局基础样式）
+2. Base CSS         — baseCSSContent（from @md/shared/configs，全局基础样式）
        ↓
-3. Theme CSS        — themeMap[themeName]（from @md/shared，scoped to #output）
+3. Theme CSS        — themeMap[themeName]（from @md/shared/configs，scoped to #output）
        ↓
 4. Heading Styles   — generateHeadingStyles()（可选，按级别自定义标题样式）
        ↓
@@ -188,7 +204,7 @@ modifyHtmlContent(markdown, renderer)
 
 ```typescript
 import { generateCSSVariables } from '@md/core/theme'
-import { baseCSSContent, themeMap } from '@md/shared'
+import { baseCSSContent, themeMap } from '@md/shared/configs' // ⚠️ 必须用子路径
 
 // 组装完整 CSS
 const variables = generateCSSVariables({
@@ -427,7 +443,7 @@ mkdir -p apps/obsidian/{src/{views,settings,core,utils,types},styles}
   "description": "Obsidian plugin for converting Markdown to WeChat format",
   "main": "main.js",
   "scripts": {
-    "dev": "node esbuild.config.mjs",
+    "dev": "cross-env OBSIDIAN_VAULT_PATH=/path/to/your/vault node esbuild.config.mjs",
     "build": "tsc -noEmit && node esbuild.config.mjs production",
     "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
@@ -436,12 +452,11 @@ mkdir -p apps/obsidian/{src/{views,settings,core,utils,types},styles}
     "@md/core": "workspace:*",
     "@md/shared": "workspace:*",
     "isomorphic-dompurify": "^2.35.0",
-    "juice": "^10.0.0"
+    "juice": "^11.0.3"
   },
   "devDependencies": {
-    "@types/node": "^20.14.9",
-    "@types/obsidian": "^1.7.2",
     "builtin-modules": "^4.0.0",
+    "cross-env": "^7.0.3",
     "esbuild": "^0.23.1",
     "obsidian": "latest",
     "typescript": "^5.9.0"
@@ -480,6 +495,7 @@ mkdir -p apps/obsidian/{src/{views,settings,core,utils,types},styles}
 
 ```javascript
 import { copyFile, mkdir } from 'node:fs/promises'
+import path from 'node:path'
 import process from 'node:process'
 import builtins from 'builtin-modules'
 import esbuild from 'esbuild'
@@ -490,6 +506,50 @@ Repository: https://github.com/doocs/md
 */`
 
 const prod = process.argv[2] === 'production'
+
+// 开发模式：输出到 Obsidian 测试仓库的插件目录
+const vaultPath = process.env.OBSIDIAN_VAULT_PATH
+const pluginDir = vaultPath
+  ? path.join(vaultPath, '.obsidian', 'plugins', 'wechat-publisher')
+  : null
+
+// ⚠️ 必需：@md/shared 的主题 CSS 使用 Vite 的 ?raw 后缀导入
+// esbuild 不识别 ?raw，需要自定义插件将其解析为普通文件路径
+const rawImportPlugin = {
+  name: 'raw-import',
+  setup(build) {
+    build.onResolve({ filter: /\?raw$/ }, (args) => {
+      const resolved = path.resolve(args.resolveDir, args.path.replace(/\?raw$/, ''))
+      return { path: resolved }
+    })
+  },
+}
+
+// 开发模式下构建完成后自动复制 manifest.json 和 styles.css 到测试仓库
+const deployPlugin = {
+  name: 'deploy-to-vault',
+  setup(build) {
+    build.onEnd(async (result) => {
+      if (result.errors.length > 0 || !pluginDir)
+        return
+      await mkdir(pluginDir, { recursive: true })
+      const src = path.dirname(new URL(import.meta.url).pathname)
+      await copyFile(path.join(src, 'manifest.json'), path.join(pluginDir, 'manifest.json'))
+      await copyFile(path.join(src, 'styles', 'styles.css'), path.join(pluginDir, 'styles.css'))
+      console.log(`Deployed to ${pluginDir}`)
+    })
+  },
+}
+
+const outfile = prod
+  ? 'dist/main.js'
+  : pluginDir
+    ? path.join(pluginDir, 'main.js')
+    : 'main.js'
+
+const plugins = [rawImportPlugin]
+if (!prod && pluginDir)
+  plugins.push(deployPlugin)
 
 const context = await esbuild.context({
   banner: { js: banner },
@@ -506,8 +566,9 @@ const context = await esbuild.context({
   logLevel: 'info',
   sourcemap: prod ? false : 'inline',
   treeShaking: true,
-  outfile: prod ? 'dist/main.js' : 'main.js',
+  outfile,
   minify: prod,
+  plugins,
   define: {
     'process.env.NODE_ENV': JSON.stringify(prod ? 'production' : 'development')
   },
@@ -521,7 +582,6 @@ if (prod) {
   await context.rebuild()
   await context.dispose()
 
-  // 复制必需文件到 dist/（与 main.js 同目录）
   await mkdir('dist', { recursive: true })
   await copyFile('manifest.json', 'dist/manifest.json')
   await copyFile('styles/styles.css', 'dist/styles.css')
@@ -530,7 +590,7 @@ if (prod) {
 }
 else {
   await context.watch()
-  console.log('Watching for changes...')
+  console.log(`Watching for changes...${pluginDir ? ` (deploying to ${pluginDir})` : ''}`)
 }
 ```
 
@@ -569,31 +629,88 @@ else {
 `apps/obsidian/src/main.ts` 关键逻辑：
 
 ```typescript
+import type { WorkspaceLeaf } from 'obsidian'
 import { initRenderer } from '@md/core/renderer'
 import { generateCSSVariables } from '@md/core/theme'
 import { modifyHtmlContent } from '@md/core/utils'
-import { baseCSSContent, themeMap } from '@md/shared'
-import { Plugin, WorkspaceLeaf } from 'obsidian'
+import { baseCSSContent, themeMap } from '@md/shared/configs' // ⚠️ 必须用子路径，避免拉入 CodeMirror
+import { Plugin } from 'obsidian'
+
+const MATHJAX_CDN = 'https://cdn-doocs.oss-cn-shenzhen.aliyuncs.com/npm/mathjax@3/es5/tex-svg.js'
+
+/**
+ * 动态加载 MathJax 3 运行时
+ * @md/core 的 KaTeX 扩展依赖 window.MathJax.texReset() / tex2svg()
+ * Web 端通过 <script> 标签加载，Obsidian 环境需要动态注入
+ *
+ * ⚠️ 踩坑：Obsidian 环境中 window.MathJax 可能已存在为配置对象（无运行时方法），
+ * 不能简单判断 `if (!window.MathJax)` 来决定是否加载，必须检测具体方法是否为 function
+ */
+async function loadMathJax(): Promise<void> {
+  if (typeof (window as any).MathJax?.tex2svg === 'function')
+    return
+
+  // 合并已有配置（不覆盖 Obsidian 可能已设置的 MathJax 配置对象）
+  const existing = (window as any).MathJax || {}
+  ;(window as any).MathJax = {
+    ...existing,
+    tex: { tags: 'ams', ...existing.tex },
+    svg: { fontCache: 'none', ...existing.svg },
+  }
+
+  if (!document.getElementById('MathJax-script')) {
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script')
+      script.id = 'MathJax-script'
+      script.src = MATHJAX_CDN
+      script.async = true
+      script.onload = () => resolve()
+      script.onerror = () => reject(new Error('Failed to load MathJax from CDN'))
+      document.head.appendChild(script)
+    })
+  }
+
+  await (window as any).MathJax?.startup?.promise
+}
+
+/** MathJax 加载失败时的降级 stub（公式显示为原始文本） */
+function installMathJaxFallback(): void {
+  const mj = ((window as any).MathJax ??= {}) as Record<string, any>
+  if (typeof mj.texReset !== 'function')
+    mj.texReset = () => {}
+  if (typeof mj.tex2svg !== 'function') {
+    mj.tex2svg = (text: string, options?: { display?: boolean }) => {
+      const span = document.createElement('span')
+      span.textContent = options?.display ? `$$${text}$$` : `$${text}$`
+      const container = document.createElement('div')
+      container.appendChild(span)
+      return container
+    }
+  }
+}
 
 export default class WeChatPublisherPlugin extends Plugin {
-  renderer = initRenderer({
-    isMacCodeBlock: false,
-    legend: 'none',
-  })
+  async onload(): Promise<void> {
+    // 优先加载 MathJax 运行时，失败则降级
+    try { await loadMathJax() }
+    catch (err) {
+      console.warn('[WeChat Publisher] MathJax 加载失败，公式将降级显示:', err)
+      installMathJaxFallback()
+    }
+
+    // ... 注册视图、命令、设置面板
+  }
 
   renderToHtml(markdown: string): { html: string, css: string } {
-    // 1. 更新渲染器配置
-    this.renderer.reset({
+    const renderer = initRenderer({
       citeStatus: this.settings.citeStatus,
       isMacCodeBlock: this.settings.isMacCodeBlock,
       isShowLineNumber: this.settings.isShowLineNumber,
       legend: this.settings.legend,
     })
 
-    // 2. 渲染 Markdown → HTML（内部已封装 marked + DOMPurify + 扩展）
-    const html = modifyHtmlContent(markdown, this.renderer)
+    const html = modifyHtmlContent(markdown, renderer)
 
-    // 3. 组装 CSS（顺序重要）
     const variables = generateCSSVariables({
       primaryColor: this.settings.primaryColor,
       fontFamily: this.settings.fontFamily,
@@ -632,22 +749,20 @@ export default class WeChatPublisherPlugin extends Plugin {
 ### 5.1 本地开发测试
 
 ```bash
-# 1. 设置环境变量（指向测试仓库）
-export OBSIDIAN_VAULT_PATH="/Users/liulinlin/obsidian_仓库/AI杂货铺"
-
-# 2. 安装依赖
+# 1. 安装依赖
 pnpm install
 
-# 3. 监听文件变化（开发模式）
+# 2. 开发模式（cross-env 注入测试仓库路径，esbuild watch + 自动部署）
+# dev 脚本已在 package.json 中配置 cross-env OBSIDIAN_VAULT_PATH=...
+# 构建产物会直接输出到 <vault>/.obsidian/plugins/wechat-publisher/
 pnpm --filter @md/obsidian dev
 
-# 4. 部署到测试仓库
-pnpm --filter @md/obsidian deploy
-
-# 5. 在 Obsidian 中启用插件
+# 3. 在 Obsidian 中启用插件
 # Settings → Community plugins → Reload plugins
 # 启用 "WeChat Publisher"
 ```
+
+> **开发模式工作原理**：`cross-env` 注入 `OBSIDIAN_VAULT_PATH` 环境变量，esbuild 的 `deployPlugin` 在每次构建完成后自动将 `main.js`、`manifest.json`、`styles.css` 复制到测试仓库的插件目录，无需手动 deploy 步骤。
 
 **热重载调试**：
 
@@ -772,7 +887,20 @@ apps/obsidian/
 └── package.json                     # 依赖管理
 ```
 
-### 7.2 常见问题 FAQ
+### 7.2 开发踩坑记录
+
+以下是实际开发过程中遇到的问题及解决方案：
+
+| 问题                             | 现象                                                                 | 根因                                                                                                          | 解决方案                                                                                              |
+| -------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `@types/obsidian` 安装失败       | `pnpm install` 报包不存在                                            | npm 上没有 `@types/obsidian`，类型定义由 `obsidian` 包自带                                                    | 从 devDependencies 中移除                                                                             |
+| `@types/node` 信任策略冲突       | `ERR_PNPM_TRUST_DOWNGRADE`                                           | 显式声明的版本与 workspace 根配置冲突                                                                         | 不显式声明，继承 workspace 根配置                                                                     |
+| esbuild 不识别 `?raw` 导入       | 构建报错找不到模块                                                   | `@md/shared` 的主题 CSS 使用 Vite 的 `?raw` 后缀导入，esbuild 不支持                                          | 自定义 `rawImportPlugin`，用 `path.resolve()` 将 `?raw` 后缀剥离并解析为绝对路径                      |
+| 插件加载失败（CodeMirror）       | Obsidian 控制台报 `require("@codemirror/...")` 错误                  | `import from '@md/shared'` 拉入了整个 shared 包，包含编辑器相关的 CodeMirror 依赖                             | 改用子路径导入 `@md/shared/configs`，只引入配置相关导出                                               |
+| MathJax `texReset` undefined     | 渲染失败：`Cannot read properties of undefined (reading 'texReset')` | `@md/core` 的 KaTeX 扩展调用 `window.MathJax.texReset()`，Obsidian 环境未加载 MathJax 运行时                  | 在 `onload()` 中动态加载 MathJax CDN 脚本                                                             |
+| MathJax `tex2svg` not a function | 第一次修复后仍报错：`window.MathJax.tex2svg is not a function`       | `window.MathJax` 在 Obsidian 中已存在为配置对象（无运行时方法），简单的 `if (!window.MathJax)` 判断会跳过加载 | 改为检测具体方法 `typeof mj.tex2svg !== 'function'`，合并已有配置后注入 CDN 脚本，失败时安装降级 stub |
+
+### 7.3 常见问题 FAQ
 
 **Q: 为什么不需要单独的 renderer.ts 包装类？**
 A: `@md/core` 已提供完整的 API（`initRenderer` + `modifyHtmlContent` + `generateCSSVariables`），VSCode 扩展验证了直接调用即可，无需额外封装层。
@@ -792,7 +920,7 @@ A: 限制嵌入展开深度为 1 级，避免无限递归。
 **Q: 自定义 CSS 不生效？**
 A: 确保 CSS 语法正确，使用开发者工具查看样式优先级。
 
-### 7.3 参考资源
+### 7.4 参考资源
 
 - [Obsidian 插件开发文档](https://docs.obsidian.md/Plugins/Getting+started/Build+a+plugin)
 - [Obsidian API 参考](https://github.com/obsidianmd/obsidian-api)
