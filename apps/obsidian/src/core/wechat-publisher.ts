@@ -10,6 +10,34 @@ import {
   wxUploadImage,
 } from './wechat-api'
 
+/**
+ * 通用 HTTP GET 请求，自动携带微信所需的 Referer 和 User-Agent
+ */
+async function fetchWithWxHeaders(url: string) {
+  return requestUrl({
+    url,
+    method: 'GET',
+    headers: {
+      'Referer': 'https://mp.weixin.qq.com/',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    },
+  })
+}
+
+/**
+ * 下载远程图片并返回 ArrayBuffer + 文件名，失败时返回 null
+ */
+async function fetchRemoteImage(url: string, prefix = 'image', defaultExt = 'jpg'): Promise<{ data: ArrayBuffer, filename: string } | null> {
+  try {
+    const res = await fetchWithWxHeaders(url)
+    const ext = new URL(url).pathname.split('.').pop() || defaultExt
+    return { data: res.arrayBuffer, filename: `${prefix}.${ext}` }
+  }
+  catch {
+    return null
+  }
+}
+
 interface PublishResult {
   mediaId: string
 }
@@ -78,17 +106,7 @@ async function fetchImageAsBuffer(src: string): Promise<{ data: ArrayBuffer, fil
   }
 
   if (src.startsWith('http://') || src.startsWith('https://')) {
-    try {
-      const headers: Record<string, string> = {}
-      headers.Referer = 'https://mp.weixin.qq.com/'
-      headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      const res = await requestUrl({ url: src, method: 'GET', headers })
-      const ext = new URL(src).pathname.split('.').pop() || 'jpg'
-      return { data: res.arrayBuffer, filename: `cover.${ext}` }
-    }
-    catch {
-      return null
-    }
+    return fetchRemoteImage(src, 'cover')
   }
 
   return null
@@ -202,18 +220,11 @@ async function replaceImages(proxyUrl: string, token: string, html: string): Pro
       if (src.includes('mmbiz.qpic.cn'))
         continue
 
-      try {
-        const res = await requestUrl({ url: src, method: 'GET' })
-        imageData = res.arrayBuffer
-        // 从 URL 提取文件名
-        const urlPath = new URL(src).pathname
-        const ext = urlPath.split('.').pop() || 'png'
-        filename = `image.${ext}`
-      }
-      catch {
-        // 下载失败，保留原始 URL
+      const result = await fetchRemoteImage(src, 'image', 'png')
+      if (!result)
         continue
-      }
+      imageData = result.data
+      filename = result.filename
     }
 
     if (imageData) {
@@ -239,14 +250,7 @@ async function fetchCoverImage(
   cover: string,
 ): Promise<{ data: ArrayBuffer, filename: string } | null> {
   if (cover.startsWith('http://') || cover.startsWith('https://')) {
-    try {
-      const res = await requestUrl({ url: cover, method: 'GET' })
-      const ext = new URL(cover).pathname.split('.').pop() || 'jpg'
-      return { data: res.arrayBuffer, filename: `cover.${ext}` }
-    }
-    catch {
-      return null
-    }
+    return fetchRemoteImage(cover, 'cover')
   }
 
   // 本地文件路径
