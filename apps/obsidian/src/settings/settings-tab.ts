@@ -173,6 +173,89 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
         })
       })
 
+    // 导入设置
+    containerEl.createEl('h3', { text: '导入设置' })
+
+    new Setting(containerEl)
+      .setName('导入文件夹')
+      .setDesc('导入笔记的保存路径，留空则保存到 Vault 根目录')
+      .addText((text) => {
+        text.setPlaceholder('例如: Imports')
+        text.setValue(this.plugin.settings.importFolder)
+        text.onChange(async (value) => {
+          this.plugin.settings.importFolder = value
+          await this.plugin.saveSettings()
+        })
+      })
+
+    new Setting(containerEl)
+      .setName('Anything-MD API 地址')
+      .setDesc('留空则使用默认地址 https://anything-md.doocs.org/')
+      .addText((text) => {
+        text.setPlaceholder('https://anything-md.doocs.org/')
+        text.setValue(this.plugin.settings.anythingMdApi)
+        text.onChange(async (value) => {
+          this.plugin.settings.anythingMdApi = value
+          await this.plugin.saveSettings()
+        })
+      })
+
+    // Jina Reader 设置
+    containerEl.createEl('h3', { text: 'Jina Reader 设置' })
+
+    new Setting(containerEl)
+      .setName('API Key')
+      .setDesc('留空则使用内置默认 Key')
+      .addText((text) => {
+        text.inputEl.type = 'password'
+        text.setPlaceholder('jina_...')
+        text.setValue(this.plugin.settings.jinaApiKey)
+        text.onChange(async (value) => {
+          this.plugin.settings.jinaApiKey = value
+          await this.plugin.saveSettings()
+        })
+      })
+
+    new Setting(containerEl)
+      .setName('强调符号')
+      .setDesc('X-Md-Em-Delimiter')
+      .addDropdown((dropdown) => {
+        dropdown.addOption('*', '* (星号)')
+        dropdown.addOption('_', '_ (下划线)')
+        dropdown.setValue(this.plugin.settings.jinaEmDelimiter)
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.jinaEmDelimiter = value
+          await this.plugin.saveSettings()
+        })
+      })
+
+    new Setting(containerEl)
+      .setName('引擎')
+      .setDesc('X-Engine')
+      .addDropdown((dropdown) => {
+        dropdown.addOption('browser', 'browser')
+        dropdown.addOption('readability', 'readability')
+        dropdown.addOption('direct', 'direct')
+        dropdown.setValue(this.plugin.settings.jinaEngine)
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.jinaEngine = value
+          await this.plugin.saveSettings()
+        })
+      })
+
+    new Setting(containerEl)
+      .setName('标题风格')
+      .setDesc('X-Md-Heading-Style')
+      .addDropdown((dropdown) => {
+        dropdown.addOption('setext', 'setext')
+        dropdown.addOption('atx', 'atx')
+        dropdown.setValue(this.plugin.settings.jinaHeadingStyle)
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.jinaHeadingStyle = value
+          await this.plugin.saveSettings()
+        })
+      })
+
     // 自定义 CSS
     containerEl.createEl('h3', { text: '自定义 CSS' })
 

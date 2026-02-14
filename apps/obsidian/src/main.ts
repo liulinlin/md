@@ -1,6 +1,7 @@
 import type { WorkspaceLeaf } from 'obsidian'
 import type { PluginSettings } from './types'
 import { Plugin } from 'obsidian'
+import { ImportUrlModal } from './modals/import-url-modal'
 import { WeChatPublisherSettingTab } from './settings/settings-tab'
 import { DEFAULT_SETTINGS, PREVIEW_VIEW_TYPE } from './types'
 import { PreviewView } from './views/preview-view'
@@ -133,6 +134,13 @@ export default class WeChatPublisherPlugin extends Plugin {
       id: 'push-wechat',
       name: '推送到微信公众号草稿箱',
       callback: () => this.pushToWechat(),
+    })
+
+    // 注册命令：从 URL 导入 Markdown
+    this.addCommand({
+      id: 'import-from-url',
+      name: '从 URL 导入 Markdown',
+      callback: () => new ImportUrlModal(this).open(),
     })
 
     // 注册设置面板

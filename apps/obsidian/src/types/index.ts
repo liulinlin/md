@@ -30,6 +30,16 @@ export interface PluginSettings {
   // Obsidian 语法
   removeTags: boolean
 
+  // 导入设置
+  importFolder: string
+  anythingMdApi: string
+
+  // Jina Reader 设置
+  jinaApiKey: string
+  jinaEmDelimiter: string
+  jinaEngine: string
+  jinaHeadingStyle: string
+
   // 自定义 CSS
   customCSS: string
 
@@ -60,6 +70,14 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   legend: 'none',
 
   removeTags: false,
+
+  importFolder: '',
+  anythingMdApi: '',
+
+  jinaApiKey: '',
+  jinaEmDelimiter: '*',
+  jinaEngine: 'browser',
+  jinaHeadingStyle: 'setext',
 
   customCSS: '',
 
