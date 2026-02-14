@@ -149,7 +149,22 @@ export default class WeChatPublisherPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
+    const data = await this.loadData() || {}
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, data)
+
+    // 迁移旧的单账号配置到 wxAccounts 数组
+    if (data.wxAppId && (!this.settings.wxAccounts || this.settings.wxAccounts.length === 0)) {
+      this.settings.wxAccounts = [{
+        name: '默认公众号',
+        appId: data.wxAppId,
+        appSecret: data.wxAppSecret || '',
+        enabled: true,
+      }]
+      // 清除旧字段
+      delete this.settings.wxAppId
+      delete this.settings.wxAppSecret
+      await this.saveData(this.settings)
+    }
   }
 
   async saveSettings(): Promise<void> {

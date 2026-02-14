@@ -1,5 +1,12 @@
 import type { ThemeName } from '@md/shared/configs'
 
+export interface WxAccount {
+  name: string
+  appId: string
+  appSecret: string
+  enabled: boolean
+}
+
 export interface PluginSettings {
   // 主题
   theme: ThemeName
@@ -27,10 +34,13 @@ export interface PluginSettings {
   customCSS: string
 
   // 微信公众号推送
-  wxAppId: string
-  wxAppSecret: string
+  wxAccounts: WxAccount[]
   wxProxyUrl: string
   wxDefaultAuthor: string
+
+  // 旧字段（迁移用，运行时不再使用）
+  wxAppId?: string
+  wxAppSecret?: string
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -53,8 +63,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 
   customCSS: '',
 
-  wxAppId: '',
-  wxAppSecret: '',
+  wxAccounts: [],
   wxProxyUrl: 'https://wx-proxy.codeby.cc',
   wxDefaultAuthor: '',
 }

@@ -8,7 +8,7 @@ import { baseCSSContent, themeMap } from '@md/shared/configs'
 import { ItemView, Notice } from 'obsidian'
 import { copyToClipboard, inlineCSS } from '../core/clipboard'
 import { ObsidianSyntaxPreprocessor } from '../core/preprocessor'
-import { publish } from '../core/wechat-publisher'
+import { publishToAll } from '../core/wechat-publisher'
 import { ensureMathJax } from '../main'
 import { PREVIEW_VIEW_TYPE } from '../types'
 /* eslint-disable no-new */
@@ -149,8 +149,9 @@ export class PreviewView extends ItemView {
   updatePushBtnVisibility(): void {
     if (!this.pushBtn)
       return
-    const { wxProxyUrl, wxAppId } = this.plugin.settings
-    this.pushBtn.style.display = (wxProxyUrl && wxAppId) ? '' : 'none'
+    const { wxProxyUrl, wxAccounts } = this.plugin.settings
+    const hasValidAccount = wxAccounts.some(a => a.enabled && a.appId && a.appSecret)
+    this.pushBtn.style.display = (wxProxyUrl && hasValidAccount) ? '' : 'none'
   }
 
   async handlePush(): Promise<void> {
@@ -165,16 +166,17 @@ export class PreviewView extends ItemView {
       return
     }
 
-    const { wxProxyUrl, wxAppId, wxAppSecret } = this.plugin.settings
-    if (!wxProxyUrl || !wxAppId || !wxAppSecret) {
+    const { wxProxyUrl, wxAccounts } = this.plugin.settings
+    const enabledAccounts = wxAccounts.filter(a => a.enabled && a.appId && a.appSecret)
+    if (!wxProxyUrl || enabledAccounts.length === 0) {
       new Notice('请先在插件设置中配置微信公众号推送参数', 3000)
       return
     }
 
-    new Notice('正在推送到微信草稿箱...', 2000)
+    new Notice(`正在推送到 ${enabledAccounts.length} 个公众号...`, 2000)
 
     try {
-      const result = await publish(
+      const results = await publishToAll(
         this.app,
         this.plugin.settings,
         this.lastHtml,
@@ -182,7 +184,23 @@ export class PreviewView extends ItemView {
         activeFile.basename,
         activeFile,
       )
-      new Notice(`推送成功！草稿 media_id: ${result.mediaId}`, 5000)
+
+      const successCount = results.filter(r => r.success).length
+      const failCount = results.length - successCount
+
+      const details = results.map((r) => {
+        const name = r.account.name || r.account.appId
+        return r.success
+          ? `✓ ${name}: ${r.mediaId}`
+          : `✗ ${name}: ${r.error}`
+      }).join('\n')
+
+      if (failCount === 0) {
+        new Notice(`全部推送成功（${successCount} 个账号）\n${details}`, 5000)
+      }
+      else {
+        new Notice(`推送完成：${successCount} 成功，${failCount} 失败\n${details}`, 8000)
+      }
     }
     catch (err) {
       const msg = err instanceof Error ? err.message : String(err)

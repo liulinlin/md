@@ -24,14 +24,15 @@ function checkResponse(data: any): void {
   }
 }
 
-// ---- Token cache ----
+// ---- Token cache (per appId) ----
 
-let cachedToken: { token: string, expiresAt: number } | null = null
+const tokenCache = new Map<string, { token: string, expiresAt: number }>()
 
 export async function wxGetToken(proxyUrl: string, appid: string, secret: string): Promise<string> {
   // Return cached token if still valid (refresh 5 min before expiry)
-  if (cachedToken && Date.now() < cachedToken.expiresAt - 5 * 60 * 1000) {
-    return cachedToken.token
+  const cached = tokenCache.get(appid)
+  if (cached && Date.now() < cached.expiresAt - 5 * 60 * 1000) {
+    return cached.token
   }
 
   const res = await requestUrl({
@@ -52,16 +53,21 @@ export async function wxGetToken(proxyUrl: string, appid: string, secret: string
     throw new Error('获取 access_token 失败：响应中无 token')
   }
 
-  cachedToken = {
+  tokenCache.set(appid, {
     token: data.access_token,
     expiresAt: Date.now() + (data.expires_in || 7200) * 1000,
-  }
+  })
 
-  return cachedToken.token
+  return data.access_token
 }
 
-export function clearTokenCache(): void {
-  cachedToken = null
+export function clearTokenCache(appid?: string): void {
+  if (appid) {
+    tokenCache.delete(appid)
+  }
+  else {
+    tokenCache.clear()
+  }
 }
 
 // ---- Multipart helper ----

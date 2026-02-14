@@ -1,5 +1,5 @@
 import type { App, TFile } from 'obsidian'
-import type { PluginSettings } from '../types'
+import type { PluginSettings, WxAccount } from '../types'
 import { requestUrl } from 'obsidian'
 import { inlineCSS } from './clipboard'
 import {
@@ -12,6 +12,13 @@ import {
 
 interface PublishResult {
   mediaId: string
+}
+
+export interface AccountPublishResult {
+  account: WxAccount
+  success: boolean
+  mediaId?: string
+  error?: string
 }
 
 /**
@@ -40,7 +47,7 @@ function decodeDataUri(dataUri: string): { data: ArrayBuffer, ext: string } | nu
 }
 
 /**
- * 推送编排器：将渲染好的 HTML 推送到微信公众号草稿箱
+ * 推送编排器：将渲染好的 HTML 推送到指定公众号的草稿箱
  */
 export async function publish(
   app: App,
@@ -49,15 +56,17 @@ export async function publish(
   css: string,
   title: string,
   file: TFile,
+  account: WxAccount,
 ): Promise<PublishResult> {
-  const { wxProxyUrl, wxAppId, wxAppSecret } = settings
+  const { wxProxyUrl } = settings
+  const { appId, appSecret } = account
 
-  if (!wxProxyUrl || !wxAppId || !wxAppSecret) {
-    throw new Error('请先在插件设置中配置微信公众号推送参数')
+  if (!wxProxyUrl || !appId || !appSecret) {
+    throw new Error('推送参数不完整，请检查代理地址和账号配置')
   }
 
   // 1. 获取 access_token
-  const token = await wxGetToken(wxProxyUrl, wxAppId, wxAppSecret)
+  const token = await wxGetToken(wxProxyUrl, appId, appSecret)
 
   // 2. CSS 内联
   let content = inlineCSS(html, css)
@@ -183,4 +192,37 @@ async function fetchCoverImage(
   }
 
   return null
+}
+
+/**
+ * 批量推送到所有已启用的公众号账号
+ */
+export async function publishToAll(
+  app: App,
+  settings: PluginSettings,
+  html: string,
+  css: string,
+  title: string,
+  file: TFile,
+): Promise<AccountPublishResult[]> {
+  const enabledAccounts = settings.wxAccounts.filter(a => a.enabled && a.appId && a.appSecret)
+
+  if (enabledAccounts.length === 0) {
+    throw new Error('没有已启用且配置完整的公众号账号，请先在设置中添加')
+  }
+
+  const results: AccountPublishResult[] = []
+
+  for (const account of enabledAccounts) {
+    try {
+      const result = await publish(app, settings, html, css, title, file, account)
+      results.push({ account, success: true, mediaId: result.mediaId })
+    }
+    catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      results.push({ account, success: false, error: msg })
+    }
+  }
+
+  return results
 }

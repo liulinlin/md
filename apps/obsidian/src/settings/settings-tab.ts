@@ -1,6 +1,7 @@
 import type { ThemeName } from '@md/shared/configs'
 import type { App } from 'obsidian'
 import type WeChatPublisherPlugin from '../main'
+import type { WxAccount } from '../types'
 import { colorOptions, fontFamilyOptions, fontSizeOptions, legendOptions, themeOptions } from '@md/shared/configs'
 import { Notice, PluginSettingTab, Setting } from 'obsidian'
 import { clearTokenCache, wxGetToken } from '../core/wechat-api'
@@ -207,33 +208,6 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
       })
 
     new Setting(containerEl)
-      .setName('AppID')
-      .setDesc('公众号后台 → 开发 → 基本配置')
-      .addText((text) => {
-        text.setPlaceholder('wx...')
-        text.setValue(this.plugin.settings.wxAppId)
-        text.onChange(async (value) => {
-          this.plugin.settings.wxAppId = value.trim()
-          clearTokenCache()
-          await this.plugin.saveSettings()
-        })
-      })
-
-    new Setting(containerEl)
-      .setName('AppSecret')
-      .setDesc('公众号后台 → 开发 → 基本配置')
-      .addText((text) => {
-        text.inputEl.type = 'password'
-        text.setPlaceholder('输入 AppSecret')
-        text.setValue(this.plugin.settings.wxAppSecret)
-        text.onChange(async (value) => {
-          this.plugin.settings.wxAppSecret = value.trim()
-          clearTokenCache()
-          await this.plugin.saveSettings()
-        })
-      })
-
-    new Setting(containerEl)
       .setName('默认作者')
       .setDesc('文章默认作者名，可在 frontmatter 中用 author 字段覆盖')
       .addText((text) => {
@@ -245,30 +219,118 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
         })
       })
 
+    // 公众号账号列表
+    this.renderAccountList(containerEl)
+  }
+
+  private renderAccountList(containerEl: HTMLElement): void {
+    const listContainer = containerEl.createDiv({ cls: 'wx-account-list' })
+
+    const accounts = this.plugin.settings.wxAccounts
+
+    for (let i = 0; i < accounts.length; i++) {
+      this.renderAccountCard(listContainer, accounts[i], i)
+    }
+
+    // 添加公众号按钮
     new Setting(containerEl)
-      .setName('测试连接')
-      .setDesc('验证代理地址和 AppID/AppSecret 是否正确')
       .addButton((btn) => {
-        btn.setButtonText('测试')
+        btn.setButtonText('+ 添加公众号')
+        btn.setCta()
         btn.onClick(async () => {
-          const { wxProxyUrl, wxAppId, wxAppSecret } = this.plugin.settings
-          if (!wxProxyUrl || !wxAppId || !wxAppSecret) {
+          this.plugin.settings.wxAccounts.push({
+            name: `公众号 ${this.plugin.settings.wxAccounts.length + 1}`,
+            appId: '',
+            appSecret: '',
+            enabled: true,
+          })
+          await this.plugin.saveSettings()
+          this.display()
+        })
+      })
+  }
+
+  private renderAccountCard(container: HTMLElement, account: WxAccount, index: number): void {
+    const card = container.createDiv({ cls: 'wx-account-card' })
+    card.style.cssText = 'border:1px solid var(--background-modifier-border);border-radius:8px;padding:12px;margin-bottom:12px;'
+
+    // 头部：名称 + 启用开关 + 删除按钮
+    new Setting(card)
+      .setName(`#${index + 1}`)
+      .addText((text) => {
+        text.setPlaceholder('账号名称')
+        text.setValue(account.name)
+        text.onChange(async (value) => {
+          account.name = value
+          await this.plugin.saveSettings()
+        })
+      })
+      .addToggle((toggle) => {
+        toggle.setTooltip('启用/禁用')
+        toggle.setValue(account.enabled)
+        toggle.onChange(async (value) => {
+          account.enabled = value
+          await this.plugin.saveSettings()
+        })
+      })
+      .addButton((btn) => {
+        btn.setIcon('trash')
+        btn.setTooltip('删除此账号')
+        btn.onClick(async () => {
+          this.plugin.settings.wxAccounts.splice(index, 1)
+          clearTokenCache(account.appId)
+          await this.plugin.saveSettings()
+          this.display()
+        })
+      })
+
+    new Setting(card)
+      .setName('AppID')
+      .addText((text) => {
+        text.setPlaceholder('wx...')
+        text.setValue(account.appId)
+        text.onChange(async (value) => {
+          clearTokenCache(account.appId)
+          account.appId = value.trim()
+          await this.plugin.saveSettings()
+        })
+      })
+
+    new Setting(card)
+      .setName('AppSecret')
+      .addText((text) => {
+        text.inputEl.type = 'password'
+        text.setPlaceholder('输入 AppSecret')
+        text.setValue(account.appSecret)
+        text.onChange(async (value) => {
+          clearTokenCache(account.appId)
+          account.appSecret = value.trim()
+          await this.plugin.saveSettings()
+        })
+      })
+
+    new Setting(card)
+      .addButton((btn) => {
+        btn.setButtonText('测试连接')
+        btn.onClick(async () => {
+          const { wxProxyUrl } = this.plugin.settings
+          if (!wxProxyUrl || !account.appId || !account.appSecret) {
             new Notice('请先填写代理地址、AppID 和 AppSecret')
             return
           }
           btn.setButtonText('测试中...')
           btn.setDisabled(true)
           try {
-            clearTokenCache()
-            await wxGetToken(wxProxyUrl, wxAppId, wxAppSecret)
-            new Notice('连接成功，access_token 获取正常')
+            clearTokenCache(account.appId)
+            await wxGetToken(wxProxyUrl, account.appId, account.appSecret)
+            new Notice(`「${account.name || '未命名'}」连接成功`)
           }
           catch (err) {
             const msg = err instanceof Error ? err.message : String(err)
-            new Notice(`连接失败: ${msg}`, 5000)
+            new Notice(`「${account.name || '未命名'}」连接失败: ${msg}`, 5000)
           }
           finally {
-            btn.setButtonText('测试')
+            btn.setButtonText('测试连接')
             btn.setDisabled(false)
           }
         })
