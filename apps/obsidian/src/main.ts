@@ -1,6 +1,7 @@
 import type { WorkspaceLeaf } from 'obsidian'
 import type { PluginSettings } from './types'
 import { Plugin } from 'obsidian'
+import { clearTokenCache } from './core/wechat-api'
 import { ImportUrlModal } from './modals/import-url-modal'
 import { WeChatPublisherSettingTab } from './settings/settings-tab'
 import { DEFAULT_SETTINGS, PREVIEW_VIEW_TYPE } from './types'
@@ -153,6 +154,7 @@ export default class WeChatPublisherPlugin extends Plugin {
   }
 
   onunload(): void {
+    clearTokenCache()
     this.app.workspace.detachLeavesOfType(PREVIEW_VIEW_TYPE)
   }
 
@@ -223,9 +225,7 @@ export default class WeChatPublisherPlugin extends Plugin {
       const view = updatedLeaves[0].view as PreviewView
       if (view?.updatePreview) {
         await view.updatePreview()
-        // 触发工具栏的复制按钮逻辑
-        const copyBtn = view.containerEl.querySelector('.wechat-publisher-toolbar button') as HTMLButtonElement
-        copyBtn?.click()
+        await view.handleCopy()
       }
     }
   }

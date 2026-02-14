@@ -19,6 +19,8 @@ export class PreviewView extends ItemView {
   private pushBtn!: HTMLButtonElement
   private lastHtml = ''
   private lastCss = ''
+  private renderVersion = 0
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(leaf: WorkspaceLeaf, plugin: WeChatPublisherPlugin) {
     super(leaf)
@@ -66,23 +68,35 @@ export class PreviewView extends ItemView {
     // 监听编辑器变化
     this.registerEvent(
       this.app.workspace.on('editor-change', () => {
-        this.updatePreview()
+        this.debouncedUpdatePreview()
       }),
     )
 
     // 监听活动文件切换
     this.registerEvent(
       this.app.workspace.on('active-leaf-change', () => {
-        this.updatePreview()
+        this.debouncedUpdatePreview()
       }),
     )
   }
 
   async onClose(): Promise<void> {
+    if (this.debounceTimer)
+      clearTimeout(this.debounceTimer)
     this.previewEl?.empty()
   }
 
+  private debouncedUpdatePreview(): void {
+    if (this.debounceTimer)
+      clearTimeout(this.debounceTimer)
+    this.debounceTimer = setTimeout(() => {
+      this.debounceTimer = null
+      this.updatePreview()
+    }, 300)
+  }
+
   async updatePreview(): Promise<void> {
+    const version = ++this.renderVersion
     const activeFile = this.app.workspace.getActiveFile()
     if (!activeFile || activeFile.extension !== 'md')
       return
@@ -97,6 +111,10 @@ export class PreviewView extends ItemView {
         this.plugin.settings,
       )
       const markdown = await preprocessor.process(rawMarkdown)
+
+      // 竞态守卫：如果有更新的渲染请求，丢弃当前结果
+      if (version !== this.renderVersion)
+        return
 
       // 确保 MathJax 运行时未被 Obsidian 覆盖
       ensureMathJax()
@@ -123,6 +141,10 @@ export class PreviewView extends ItemView {
 
       const themeCSS = themeMap[this.plugin.settings.theme as ThemeName]
       const css = `${variables}\n${baseCSSContent}\n${themeCSS}\n${this.plugin.settings.customCSS}`
+
+      // 竞态守卫：渲染完成后再次检查，避免覆盖更新的结果
+      if (version !== this.renderVersion)
+        return
 
       this.lastHtml = html
       this.lastCss = css
@@ -223,7 +245,7 @@ export class PreviewView extends ItemView {
     }
   }
 
-  private async handleCopy(): Promise<void> {
+  async handleCopy(): Promise<void> {
     if (!this.lastHtml) {
       new Notice('没有可复制的内容', 1500)
       return

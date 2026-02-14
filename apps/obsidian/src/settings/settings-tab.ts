@@ -8,10 +8,32 @@ import { clearTokenCache, wxGetToken } from '../core/wechat-api'
 /* eslint-disable no-new */
 export class WeChatPublisherSettingTab extends PluginSettingTab {
   plugin: WeChatPublisherPlugin
+  private saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
   constructor(app: App, plugin: WeChatPublisherPlugin) {
     super(app, plugin)
     this.plugin = plugin
+  }
+
+  /** 延迟保存：文本输入停止 500ms 后才写入磁盘 */
+  private debouncedSave(key: string, apply: () => void): void {
+    const existing = this.saveTimers.get(key)
+    if (existing)
+      clearTimeout(existing)
+    apply()
+    this.saveTimers.set(key, setTimeout(async () => {
+      this.saveTimers.delete(key)
+      await this.plugin.saveSettings()
+    }, 500))
+  }
+
+  hide(): void {
+    // 面板关闭时立即保存所有待保存的变更
+    for (const [key, timer] of this.saveTimers) {
+      clearTimeout(timer)
+      this.saveTimers.delete(key)
+    }
+    this.plugin.saveSettings()
   }
 
   display(): void {
@@ -182,9 +204,10 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
       .addText((text) => {
         text.setPlaceholder('例如: Imports')
         text.setValue(this.plugin.settings.importFolder)
-        text.onChange(async (value) => {
-          this.plugin.settings.importFolder = value
-          await this.plugin.saveSettings()
+        text.onChange((value) => {
+          this.debouncedSave('importFolder', () => {
+            this.plugin.settings.importFolder = value
+          })
         })
       })
 
@@ -194,9 +217,10 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
       .addText((text) => {
         text.setPlaceholder('https://anything-md.doocs.org/')
         text.setValue(this.plugin.settings.anythingMdApi)
-        text.onChange(async (value) => {
-          this.plugin.settings.anythingMdApi = value
-          await this.plugin.saveSettings()
+        text.onChange((value) => {
+          this.debouncedSave('anythingMdApi', () => {
+            this.plugin.settings.anythingMdApi = value
+          })
         })
       })
 
@@ -210,9 +234,10 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
         text.inputEl.type = 'password'
         text.setPlaceholder('jina_...')
         text.setValue(this.plugin.settings.jinaApiKey)
-        text.onChange(async (value) => {
-          this.plugin.settings.jinaApiKey = value
-          await this.plugin.saveSettings()
+        text.onChange((value) => {
+          this.debouncedSave('jinaApiKey', () => {
+            this.plugin.settings.jinaApiKey = value
+          })
         })
       })
 
@@ -268,9 +293,10 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
         text.inputEl.style.fontFamily = 'monospace'
         text.inputEl.style.fontSize = '12px'
         text.setValue(this.plugin.settings.customCSS)
-        text.onChange(async (value) => {
-          this.plugin.settings.customCSS = value
-          await this.plugin.saveSettings()
+        text.onChange((value) => {
+          this.debouncedSave('customCSS', () => {
+            this.plugin.settings.customCSS = value
+          })
         })
       })
 
@@ -283,10 +309,11 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
       .addText((text) => {
         text.setPlaceholder('https://wx-proxy.codeby.cc/')
         text.setValue(this.plugin.settings.wxProxyUrl)
-        text.onChange(async (value) => {
-          this.plugin.settings.wxProxyUrl = value.replace(/\/+$/, '')
-          clearTokenCache()
-          await this.plugin.saveSettings()
+        text.onChange((value) => {
+          this.debouncedSave('wxProxyUrl', () => {
+            this.plugin.settings.wxProxyUrl = value.replace(/\/+$/, '')
+            clearTokenCache()
+          })
         })
       })
 
@@ -296,9 +323,10 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
       .addText((text) => {
         text.setPlaceholder('作者名')
         text.setValue(this.plugin.settings.wxDefaultAuthor)
-        text.onChange(async (value) => {
-          this.plugin.settings.wxDefaultAuthor = value
-          await this.plugin.saveSettings()
+        text.onChange((value) => {
+          this.debouncedSave('wxDefaultAuthor', () => {
+            this.plugin.settings.wxDefaultAuthor = value
+          })
         })
       })
 
@@ -343,9 +371,10 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
       .addText((text) => {
         text.setPlaceholder('账号名称')
         text.setValue(account.name)
-        text.onChange(async (value) => {
-          account.name = value
-          await this.plugin.saveSettings()
+        text.onChange((value) => {
+          this.debouncedSave(`account-name-${index}`, () => {
+            account.name = value
+          })
         })
       })
       .addToggle((toggle) => {
@@ -372,10 +401,11 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
       .addText((text) => {
         text.setPlaceholder('wx...')
         text.setValue(account.appId)
-        text.onChange(async (value) => {
-          clearTokenCache(account.appId)
-          account.appId = value.trim()
-          await this.plugin.saveSettings()
+        text.onChange((value) => {
+          this.debouncedSave(`account-appId-${index}`, () => {
+            clearTokenCache(account.appId)
+            account.appId = value.trim()
+          })
         })
       })
 
@@ -385,10 +415,11 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
         text.inputEl.type = 'password'
         text.setPlaceholder('输入 AppSecret')
         text.setValue(account.appSecret)
-        text.onChange(async (value) => {
-          clearTokenCache(account.appId)
-          account.appSecret = value.trim()
-          await this.plugin.saveSettings()
+        text.onChange((value) => {
+          this.debouncedSave(`account-appSecret-${index}`, () => {
+            clearTokenCache(account.appId)
+            account.appSecret = value.trim()
+          })
         })
       })
 

@@ -75,8 +75,8 @@ export function clearTokenCache(appid?: string): void {
 function buildMultipart(fieldName: string, filename: string, data: ArrayBuffer): { body: ArrayBuffer, contentType: string } {
   const boundary = `----WeChatPublisher${Array.from({ length: 16 }, () => Math.random().toString(36)[2]).join('')}`
 
-  const pre = `------${boundary}\r\nContent-Disposition: form-data; name="${fieldName}"; filename="${filename}"\r\nContent-Type: "application/octet-stream"\r\n\r\n`
-  const post = `\r\n------${boundary}--`
+  const pre = `--${boundary}\r\nContent-Disposition: form-data; name="${fieldName}"; filename="${filename}"\r\nContent-Type: application/octet-stream\r\n\r\n`
+  const post = `\r\n--${boundary}--`
 
   const preBytes = new TextEncoder().encode(pre)
   const postBytes = new TextEncoder().encode(post)
@@ -89,7 +89,7 @@ function buildMultipart(fieldName: string, filename: string, data: ArrayBuffer):
 
   return {
     body: combined.buffer,
-    contentType: `multipart/form-data; boundary=----${boundary}`,
+    contentType: `multipart/form-data; boundary=${boundary}`,
   }
 }
 

@@ -61,7 +61,7 @@ function getFrontmatter(app: App, file: TFile): Record<string, any> {
  * 将 base64 data URI 解码为 ArrayBuffer + 文件名
  */
 function decodeDataUri(dataUri: string): { data: ArrayBuffer, ext: string } | null {
-  const match = dataUri.match(/^data:image\/(\w+);base64,(.+)$/)
+  const match = dataUri.match(/^data:image\/([\w+]+);base64,(.+)$/)
   if (!match)
     return null
 
@@ -75,23 +75,11 @@ function decodeDataUri(dataUri: string): { data: ArrayBuffer, ext: string } | nu
 }
 
 /**
- * 从 HTML 内容中提取第一个图片的 src
- * 支持 <img> 标签和 Markdown 图片语法 ![alt](url)
+ * 从 HTML 内容中提取第一个 <img> 的 src
  */
 function extractFirstImage(html: string): string | null {
-  // 同时匹配 <img src="..."> 和 ![...](...)
-  const imgTagMatch = html.match(/<img\s[^>]*src="([^"]+)"/)
-  const mdImgMatch = html.match(/!\[[^\]]*\]\(([^)]+)\)/)
-
-  if (!imgTagMatch && !mdImgMatch)
-    return null
-
-  // 返回最先出现的那个
-  if (imgTagMatch && mdImgMatch) {
-    return imgTagMatch.index! < mdImgMatch.index! ? imgTagMatch[1] : mdImgMatch[1]
-  }
-
-  return imgTagMatch ? imgTagMatch[1] : mdImgMatch![1]
+  const match = html.match(/<img\s[^>]*src="([^"]+)"/)
+  return match ? match[1] : null
 }
 
 /**
@@ -197,45 +185,71 @@ export async function publish(
 
 /**
  * 提取并上传 HTML 中所有 <img> 的图片，替换为微信 CDN URL
+ * 并发下载和上传（最多 5 个并行），使用精确位置替换避免误替换
  */
 async function replaceImages(proxyUrl: string, token: string, html: string): Promise<string> {
   const imgRegex = /<img\s[^>]*src="([^"]+)"[^>]*>/g
   const matches = [...html.matchAll(imgRegex)]
 
-  for (const match of matches) {
+  // 阶段 1：并发准备所有图片数据
+  interface ImageTask {
+    src: string
+    fullMatch: string
+    imageData: ArrayBuffer
+    filename: string
+  }
+
+  const prepareTask = async (match: RegExpExecArray): Promise<ImageTask | null> => {
     const src = match[1]
-    let imageData: ArrayBuffer | null = null
-    let filename = 'image.png'
 
     if (src.startsWith('data:image')) {
-      // base64 data URI
       const decoded = decodeDataUri(src)
-      if (decoded) {
-        imageData = decoded.data
-        filename = `image.${decoded.ext}`
-      }
+      if (!decoded)
+        return null
+      return { src, fullMatch: match[0], imageData: decoded.data, filename: `image.${decoded.ext}` }
     }
-    else if (src.startsWith('http://') || src.startsWith('https://')) {
-      // 已经是微信 CDN 的图片跳过
-      if (src.includes('mmbiz.qpic.cn'))
-        continue
 
+    if (src.startsWith('http://') || src.startsWith('https://')) {
+      if (src.includes('mmbiz.qpic.cn'))
+        return null
       const result = await fetchRemoteImage(src, 'image', 'png')
       if (!result)
-        continue
-      imageData = result.data
-      filename = result.filename
+        return null
+      return { src, fullMatch: match[0], imageData: result.data, filename: result.filename }
     }
 
-    if (imageData) {
-      try {
-        const cdnUrl = await wxUploadImage(proxyUrl, token, imageData, filename)
-        html = html.split(src).join(cdnUrl)
-      }
-      catch {
-        // 上传失败，保留原始 src
+    return null
+  }
+
+  const tasks = (await Promise.all(matches.map(m => prepareTask(m)))).filter((t): t is ImageTask => t !== null)
+
+  // 阶段 2：并发上传（限制并发数 5）
+  const CONCURRENCY = 5
+  const urlMap = new Map<string, string>()
+
+  for (let i = 0; i < tasks.length; i += CONCURRENCY) {
+    const batch = tasks.slice(i, i + CONCURRENCY)
+    const results = await Promise.allSettled(
+      batch.map(async (task) => {
+        const cdnUrl = await wxUploadImage(proxyUrl, token, task.imageData, task.filename)
+        urlMap.set(task.src, cdnUrl)
+      }),
+    )
+    for (const r of results) {
+      if (r.status === 'rejected') {
+        console.warn('[WeChat Publisher] Image upload failed:', r.reason)
       }
     }
+  }
+
+  // 阶段 3：从后往前精确替换 <img> 标签中的 src，避免误替换其他位置
+  for (const match of [...matches].reverse()) {
+    const src = match[1]
+    const cdnUrl = urlMap.get(src)
+    if (!cdnUrl || match.index === undefined)
+      continue
+    const newTag = match[0].replace(src, cdnUrl)
+    html = html.slice(0, match.index) + newTag + html.slice(match.index + match[0].length)
   }
 
   return html
@@ -264,7 +278,7 @@ async function fetchCoverImage(
 }
 
 /**
- * 批量推送到所有已启用的公众号账号
+ * 批量推送到所有已启用的公众号账号（并行执行）
  */
 export async function publishToAll(
   app: App,
@@ -281,18 +295,16 @@ export async function publishToAll(
     throw new Error('没有已启用且配置完整的公众号账号，请先在设置中添加')
   }
 
-  const results: AccountPublishResult[] = []
+  const results = await Promise.allSettled(
+    enabledAccounts.map(account => publish(app, settings, html, css, title, file, account)),
+  )
 
-  for (const account of enabledAccounts) {
-    try {
-      const result = await publish(app, settings, html, css, title, file, account)
-      results.push({ account, success: true, mediaId: result.mediaId })
+  return enabledAccounts.map((account, i) => {
+    const result = results[i]
+    if (result.status === 'fulfilled') {
+      return { account, success: true, mediaId: result.value.mediaId }
     }
-    catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      results.push({ account, success: false, error: msg })
-    }
-  }
-
-  return results
+    const msg = result.reason instanceof Error ? result.reason.message : String(result.reason)
+    return { account, success: false, error: msg }
+  })
 }
