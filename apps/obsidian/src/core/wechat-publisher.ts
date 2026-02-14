@@ -47,6 +47,54 @@ function decodeDataUri(dataUri: string): { data: ArrayBuffer, ext: string } | nu
 }
 
 /**
+ * 从 HTML 内容中提取第一个图片的 src
+ * 支持 <img> 标签和 Markdown 图片语法 ![alt](url)
+ */
+function extractFirstImage(html: string): string | null {
+  // 同时匹配 <img src="..."> 和 ![...](...)
+  const imgTagMatch = html.match(/<img\s[^>]*src="([^"]+)"/)
+  const mdImgMatch = html.match(/!\[[^\]]*\]\(([^)]+)\)/)
+
+  if (!imgTagMatch && !mdImgMatch)
+    return null
+
+  // 返回最先出现的那个
+  if (imgTagMatch && mdImgMatch) {
+    return imgTagMatch.index! < mdImgMatch.index! ? imgTagMatch[1] : mdImgMatch[1]
+  }
+
+  return imgTagMatch ? imgTagMatch[1] : mdImgMatch![1]
+}
+
+/**
+ * 将图片 src 转为 ArrayBuffer + 文件名，支持 data URI 和 HTTP(S) URL
+ */
+async function fetchImageAsBuffer(src: string): Promise<{ data: ArrayBuffer, filename: string } | null> {
+  if (src.startsWith('data:image')) {
+    const decoded = decodeDataUri(src)
+    if (!decoded)
+      return null
+    return { data: decoded.data, filename: `cover.${decoded.ext}` }
+  }
+
+  if (src.startsWith('http://') || src.startsWith('https://')) {
+    try {
+      const headers: Record<string, string> = {}
+      headers.Referer = 'https://mp.weixin.qq.com/'
+      headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      const res = await requestUrl({ url: src, method: 'GET', headers })
+      const ext = new URL(src).pathname.split('.').pop() || 'jpg'
+      return { data: res.arrayBuffer, filename: `cover.${ext}` }
+    }
+    catch {
+      return null
+    }
+  }
+
+  return null
+}
+
+/**
  * 推送编排器：将渲染好的 HTML 推送到指定公众号的草稿箱
  */
 export async function publish(
@@ -71,10 +119,7 @@ export async function publish(
   // 2. CSS 内联
   let content = inlineCSS(html, css)
 
-  // 3. 上传图片并替换 URL
-  content = await replaceImages(wxProxyUrl, token, content)
-
-  // 4. 处理封面图
+  // 3. 处理封面图
   const fm = getFrontmatter(app, file)
   let thumbMediaId = ''
 
@@ -87,6 +132,23 @@ export async function publish(
   }
 
   if (!thumbMediaId) {
+    // 尝试从文章内容提取第一张图片作为封面
+    const firstImgSrc = extractFirstImage(content)
+    if (firstImgSrc) {
+      console.log('尝试使用文章中的第一张图片作为封面:', firstImgSrc)
+      const imgBuffer = await fetchImageAsBuffer(firstImgSrc)
+      if (imgBuffer) {
+        try {
+          thumbMediaId = await wxUploadCover(wxProxyUrl, token, imgBuffer.data, imgBuffer.filename)
+        }
+        catch {
+          // 上传失败，降级到素材库
+        }
+      }
+    }
+  }
+
+  if (!thumbMediaId) {
     // 尝试从素材库取第一个图片素材
     thumbMediaId = await wxBatchGetMaterial(wxProxyUrl, token) || ''
   }
@@ -94,6 +156,9 @@ export async function publish(
   if (!thumbMediaId) {
     throw new Error('未找到封面图。请在 frontmatter 中设置 cover 字段，或在公众号后台上传至少一张图片素材。')
   }
+
+  // 4. 上传图片并替换 URL
+  content = await replaceImages(wxProxyUrl, token, content)
 
   // 5. 组装文章
   const articleTitle = fm.title || title
