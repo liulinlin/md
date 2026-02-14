@@ -10,6 +10,7 @@ import { copyToClipboard, inlineCSS } from '../core/clipboard'
 import { ObsidianSyntaxPreprocessor } from '../core/preprocessor'
 import { publishToAll } from '../core/wechat-publisher'
 import { ensureMathJax } from '../main'
+import { PushAccountModal } from '../modals/push-account-modal'
 import { PREVIEW_VIEW_TYPE } from '../types'
 /* eslint-disable no-new */
 export class PreviewView extends ItemView {
@@ -173,7 +174,19 @@ export class PreviewView extends ItemView {
       return
     }
 
-    new Notice(`正在推送到 ${enabledAccounts.length} 个公众号...`, 2000)
+    // 多个账号时弹窗选择，单个账号直接推送
+    let selectedAccounts: typeof enabledAccounts
+    if (enabledAccounts.length > 1) {
+      const chosen = await new PushAccountModal(this.app, enabledAccounts).openAndGetAccounts()
+      if (!chosen || chosen.length === 0)
+        return
+      selectedAccounts = chosen
+    }
+    else {
+      selectedAccounts = enabledAccounts
+    }
+
+    new Notice(`正在推送到 ${selectedAccounts.length} 个公众号...`, 2000)
 
     try {
       const results = await publishToAll(
@@ -183,6 +196,7 @@ export class PreviewView extends ItemView {
         this.lastCss,
         activeFile.basename,
         activeFile,
+        selectedAccounts,
       )
 
       const successCount = results.filter(r => r.success).length

@@ -204,8 +204,9 @@ export async function publishToAll(
   css: string,
   title: string,
   file: TFile,
+  accounts?: WxAccount[],
 ): Promise<AccountPublishResult[]> {
-  const enabledAccounts = settings.wxAccounts.filter(a => a.enabled && a.appId && a.appSecret)
+  const enabledAccounts = accounts ?? settings.wxAccounts.filter(a => a.enabled && a.appId && a.appSecret)
 
   if (enabledAccounts.length === 0) {
     throw new Error('没有已启用且配置完整的公众号账号，请先在设置中添加')
