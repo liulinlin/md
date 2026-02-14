@@ -34,16 +34,21 @@ async function loadMathJax(): Promise<void> {
     svg: { fontCache: 'none', ...existing.svg },
   }
 
-  // 注入 script 标签加载 CDN
-  await new Promise<void>((resolve, reject) => {
-    const script = document.createElement('script')
-    script.id = 'MathJax-script'
-    script.src = MATHJAX_CDN
-    script.async = true
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Failed to load MathJax from CDN'))
-    document.head.appendChild(script)
-  })
+  // 注入 script 标签加载 CDN（带超时，防止移动端阻塞 onload）
+  await Promise.race([
+    new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script')
+      script.id = 'MathJax-script'
+      script.src = MATHJAX_CDN
+      script.async = true
+      script.onload = () => resolve()
+      script.onerror = () => reject(new Error('Failed to load MathJax from CDN'))
+      document.head.appendChild(script)
+    }),
+    new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error('MathJax load timeout (5s)')), 5000),
+    ),
+  ])
 
   // 等待 MathJax 完成内部初始化
   await (window as any).MathJax?.startup?.promise

@@ -195,9 +195,9 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('代理服务器地址')
-      .setDesc('部署 apps/web 中的 Cloudflare Worker 后填入 URL，例如 https://your-worker.workers.dev')
+      .setDesc('默认使用 https://wx-proxy.codeby.cc/，也可自行部署代理服务器（见项目 README）')
       .addText((text) => {
-        text.setPlaceholder('https://your-worker.workers.dev')
+        text.setPlaceholder('https://wx-proxy.codeby.cc/')
         text.setValue(this.plugin.settings.wxProxyUrl)
         text.onChange(async (value) => {
           this.plugin.settings.wxProxyUrl = value.replace(/\/+$/, '')

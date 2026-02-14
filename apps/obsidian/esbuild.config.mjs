@@ -29,6 +29,50 @@ const rawImportPlugin = {
   },
 }
 
+// Node.js 内建模块 shim 插件
+// postcss（@md/core 依赖）使用 fs/path/url 处理 source map，reading-time 使用 stream/util
+// 这些功能在移动端 WebView 中不可用，提供 shim 使其降级运行
+// reading-time 的 stream.js 在模块加载时调用 util.inherits 和 stream.Transform，
+// 需要提供最小 polyfill 避免崩溃（stream 功能运行时不会被实际调用）
+const nodeShimPlugin = {
+  name: 'node-builtins-shim',
+  setup(build) {
+    const shimmed = new Set(builtins.flatMap(m => [m, `node:${m}`]))
+    build.onResolve({ filter: /.*/ }, (args) => {
+      if (shimmed.has(args.path)) {
+        return { path: args.path, namespace: 'node-shim' }
+      }
+    })
+    build.onLoad({ filter: /.*/, namespace: 'node-shim' }, (args) => {
+      const mod = args.path.replace(/^node:/, '')
+      // util: reading-time 的 stream.js 调用 util.inherits(ReadingTimeStream, Transform)
+      if (mod === 'util') {
+        return {
+          contents: `module.exports = {
+  inherits: function(ctor, superCtor) {
+    if (superCtor) {
+      ctor.super_ = superCtor;
+      ctor.prototype = Object.create(superCtor.prototype, {
+        constructor: { value: ctor, writable: true, configurable: true }
+      });
+    }
+  }
+};`,
+          loader: 'js',
+        }
+      }
+      // stream: reading-time 的 stream.js 需要 stream.Transform 构造函数
+      if (mod === 'stream') {
+        return {
+          contents: `function Transform() {} module.exports = { Transform: Transform };`,
+          loader: 'js',
+        }
+      }
+      return { contents: 'module.exports = {};', loader: 'js' }
+    })
+  },
+}
+
 // 开发模式下构建完成后自动复制到测试仓库
 const deployPlugin = {
   name: 'deploy-to-vault',
@@ -52,7 +96,7 @@ const outfile = prod
     ? path.join(pluginDir, 'main.js')
     : 'main.js'
 
-const plugins = [rawImportPlugin]
+const plugins = [rawImportPlugin, nodeShimPlugin]
 if (!prod && pluginDir) {
   plugins.push(deployPlugin)
 }
@@ -61,11 +105,11 @@ const context = await esbuild.context({
   banner: { js: banner },
   entryPoints: ['src/main.ts'],
   bundle: true,
+  platform: 'browser',
   external: [
     'obsidian',
     'electron',
     '@codemirror/*',
-    ...builtins,
   ],
   format: 'cjs',
   target: 'es2021',
