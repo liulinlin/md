@@ -55,7 +55,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 
   wxAppId: '',
   wxAppSecret: '',
-  wxProxyUrl: '',
+  wxProxyUrl: 'https://wx-proxy.codeby.cc',
   wxDefaultAuthor: '',
 }
 
