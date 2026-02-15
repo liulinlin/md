@@ -3,7 +3,7 @@ import type { App } from 'obsidian'
 import type WeChatPublisherPlugin from '../main'
 import type { WxAccount } from '../types'
 import { colorOptions, fontFamilyOptions, fontSizeOptions, legendOptions, themeOptions } from '@md/shared/configs'
-import { Notice, PluginSettingTab, Setting, SettingGroup } from 'obsidian'
+import { Notice, PluginSettingTab, Setting, SettingGroup, TFolder } from 'obsidian'
 import { clearTokenCache, wxGetToken } from '../core/wechat-api'
 /* eslint-disable no-new */
 export class WeChatPublisherSettingTab extends PluginSettingTab {
@@ -193,14 +193,19 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
       .setHeading('导入设置')
       .addSetting(s => s
         .setName('导入文件夹')
-        .setDesc('导入笔记的保存路径，留空则保存到 Vault 根目录')
-        .addText((text) => {
-          text.setPlaceholder('例如: Imports')
-          text.setValue(this.plugin.settings.importFolder)
-          text.onChange((value) => {
-            this.debouncedSave('importFolder', () => {
-              this.plugin.settings.importFolder = value
-            })
+        .setDesc('导入笔记的保存路径，选择「Vault 根目录」则保存到根目录')
+        .addDropdown((dropdown) => {
+          dropdown.addOption('', 'Vault 根目录')
+          const root = this.app.vault.getRoot()
+          for (const child of root.children) {
+            if (child instanceof TFolder) {
+              dropdown.addOption(child.path, child.path)
+            }
+          }
+          dropdown.setValue(this.plugin.settings.importFolder)
+          dropdown.onChange(async (value) => {
+            this.plugin.settings.importFolder = value
+            await this.plugin.saveSettings()
           })
         }))
       .addSetting(s => s
