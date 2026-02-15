@@ -1,5 +1,5 @@
 import type WeChatPublisherPlugin from '../main'
-import { Modal, normalizePath, Notice, Setting } from 'obsidian'
+import { Modal, normalizePath, Notice, SettingGroup } from 'obsidian'
 import { extractTitle, fetchViaAnythingMd, fetchViaJina, sanitizeFilename } from '../core/url-importer'
 
 type ImportMethod = 'anything-md' | 'jina'
@@ -18,47 +18,44 @@ export class ImportUrlModal extends Modal {
   onOpen(): void {
     const { contentEl } = this
     contentEl.empty()
-    contentEl.createEl('h2', { text: '从 URL 导入 Markdown' })
-
-    // 导入方式选择
-    new Setting(contentEl)
-      .setName('导入方式')
-      .addDropdown((dropdown) => {
-        dropdown.addOption('anything-md', 'Anything-MD')
-        dropdown.addOption('jina', 'Jina Reader')
-        dropdown.setValue(this.method)
-        dropdown.onChange((value) => {
-          this.method = value as ImportMethod
-        })
-      })
-
-    // URL 输入
-    new Setting(contentEl)
-      .setName('网页链接')
-      .setDesc('输入要转换的网页 URL')
-      .addText((text) => {
-        text.setPlaceholder('https://example.com/article')
-        text.onChange((value) => {
-          this.url = value.trim()
-        })
-        // Enter 快捷键触发导入
-        text.inputEl.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault()
-            this.doImport()
-          }
-        })
-        // 自动聚焦
-        setTimeout(() => text.inputEl.focus(), 50)
-      })
-
-    // 导入按钮
-    new Setting(contentEl)
-      .addButton((btn) => {
-        btn.setButtonText('导入')
-        btn.setCta()
-        btn.onClick(() => this.doImport())
-      })
+    // URL 输入 + 导入方式 + 导入按钮
+    new SettingGroup(contentEl)
+      .setHeading('导入网页')
+      .addSetting(s => s
+        .setName('网页链接')
+        .setDesc('输入要转换的网页 URL')
+        .addText((text) => {
+          text.setPlaceholder('https://example.com/article')
+          text.onChange((value) => {
+            this.url = value.trim()
+          })
+          // Enter 快捷键触发导入
+          text.inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              this.doImport()
+            }
+          })
+          // 自动聚焦
+          setTimeout(() => text.inputEl.focus(), 50)
+        }))
+      .addSetting(s => s
+        .setName('导入方式')
+        .setDesc('Jina Reader 适合twitter，Anything-MD 在某些特定网站（如掘金）表现更好')
+        .addDropdown((dropdown) => {
+          dropdown.addOption('anything-md', 'Anything-MD')
+          dropdown.addOption('Jina', 'Jina Reader')
+          dropdown.setValue(this.method)
+          dropdown.onChange((value) => {
+            this.method = value as ImportMethod
+          })
+        }))
+      .addSetting(s => s
+        .addButton((btn) => {
+          btn.setButtonText('导入')
+          btn.setCta()
+          btn.onClick(() => this.doImport())
+        }))
 
     // 状态行
     this.statusEl = contentEl.createEl('div', {
