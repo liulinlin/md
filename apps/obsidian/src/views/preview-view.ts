@@ -6,6 +6,7 @@ import { generateCSSVariables } from '@md/core/theme'
 import { modifyHtmlContent } from '@md/core/utils'
 import { baseCSSContent, themeMap } from '@md/shared/configs'
 import { ItemView, Notice } from 'obsidian'
+import { polishMarkdown } from '../core/ai-polish'
 import { copyToClipboard, inlineCSS } from '../core/clipboard'
 import { ObsidianSyntaxPreprocessor } from '../core/preprocessor'
 import { publishToAll } from '../core/wechat-publisher'
@@ -17,6 +18,8 @@ export class PreviewView extends ItemView {
   plugin: WeChatPublisherPlugin
   private previewEl!: HTMLElement
   private pushBtn!: HTMLButtonElement
+  private polishBtn!: HTMLButtonElement
+  private polishAbortController: AbortController | null = null
   private lastHtml = ''
   private lastCss = ''
   private renderVersion = 0
@@ -53,6 +56,11 @@ export class PreviewView extends ItemView {
     const refreshBtn = toolbar.createEl('button', { text: '刷新' })
     refreshBtn.addEventListener('click', () => this.updatePreview())
 
+    // 润色按钮（AI 未配置时隐藏）
+    this.polishBtn = toolbar.createEl('button', { text: '润色' })
+    this.polishBtn.addEventListener('click', () => this.handlePolish())
+    this.updatePolishBtnVisibility()
+
     // 推送按钮（配置不完整时隐藏）
     this.pushBtn = toolbar.createEl('button', { text: '推送' })
     this.pushBtn.addEventListener('click', () => this.handlePush())
@@ -83,6 +91,8 @@ export class PreviewView extends ItemView {
   async onClose(): Promise<void> {
     if (this.debounceTimer)
       clearTimeout(this.debounceTimer)
+    this.polishAbortController?.abort()
+    this.polishAbortController = null
     this.previewEl?.empty()
   }
 
@@ -175,6 +185,41 @@ export class PreviewView extends ItemView {
     const { wxProxyUrl, wxAccounts } = this.plugin.settings
     const hasValidAccount = wxAccounts.some(a => a.enabled && a.appId && a.appSecret)
     this.pushBtn.style.display = (wxProxyUrl && hasValidAccount) ? '' : 'none'
+  }
+
+  updatePolishBtnVisibility(): void {
+    if (!this.polishBtn)
+      return
+    const { aiEndpoint, aiModel } = this.plugin.settings
+    this.polishBtn.style.display = (aiEndpoint && aiModel) ? '' : 'none'
+  }
+
+  async handlePolish(): Promise<void> {
+    const activeFile = this.app.workspace.getActiveFile()
+    if (!activeFile || activeFile.extension !== 'md') {
+      new Notice('请先打开一个 Markdown 文件', 1500)
+      return
+    }
+
+    const originalText = this.polishBtn.textContent
+    this.polishBtn.textContent = '润色中...'
+    this.polishBtn.disabled = true
+
+    try {
+      const markdown = await this.app.vault.read(activeFile)
+      const result = await polishMarkdown(this.plugin.settings, markdown)
+      await this.app.vault.modify(activeFile, result.content)
+      new Notice('润色完成', 1500)
+    }
+    catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('[WeChat Publisher] Polish failed:', err)
+      new Notice(`润色失败: ${msg}`, 5000)
+    }
+    finally {
+      this.polishBtn.textContent = originalText
+      this.polishBtn.disabled = false
+    }
   }
 
   async handlePush(): Promise<void> {

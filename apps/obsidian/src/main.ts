@@ -187,6 +187,7 @@ export default class WeChatPublisherPlugin extends Plugin {
       if (view?.updatePreview) {
         view.updatePreview()
         view.updatePushBtnVisibility()
+        view.updatePolishBtnVisibility()
       }
     }
   }

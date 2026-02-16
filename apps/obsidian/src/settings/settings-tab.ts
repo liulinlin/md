@@ -2,7 +2,7 @@ import type { ThemeName } from '@md/shared/configs'
 import type { App } from 'obsidian'
 import type WeChatPublisherPlugin from '../main'
 import type { WxAccount } from '../types'
-import { colorOptions, fontFamilyOptions, fontSizeOptions, legendOptions, themeOptions } from '@md/shared/configs'
+import { colorOptions, fontFamilyOptions, fontSizeOptions, legendOptions, serviceOptions, themeOptions } from '@md/shared/configs'
 import { Notice, PluginSettingTab, Setting, SettingGroup, TFolder } from 'obsidian'
 import { clearTokenCache, wxGetToken } from '../core/wechat-api'
 /* eslint-disable no-new */
@@ -293,6 +293,136 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
             })
           })
         }))
+
+    // AI 润色
+    const aiGroup = new SettingGroup(containerEl)
+      .setHeading('AI 润色')
+
+    aiGroup.addSetting((s) => {
+      s.setName('AI 服务')
+        .setDesc('选择 AI 服务提供商')
+        .addDropdown((dropdown) => {
+          for (const opt of serviceOptions) {
+            dropdown.addOption(opt.value, opt.label)
+          }
+          dropdown.setValue(this.plugin.settings.aiServiceType)
+          dropdown.onChange(async (value) => {
+            this.plugin.settings.aiServiceType = value
+            const selected = serviceOptions.find(o => o.value === value)
+            if (selected) {
+              this.plugin.settings.aiEndpoint = selected.endpoint
+              this.plugin.settings.aiModel = selected.models[0] || ''
+            }
+            await this.plugin.saveSettings()
+            this.display()
+          })
+        })
+    })
+
+    aiGroup.addSetting((s) => {
+      s.setName('API 端点')
+        .addText((text) => {
+          text.setPlaceholder('https://api.openai.com/v1')
+          text.setValue(this.plugin.settings.aiEndpoint)
+          text.onChange((value) => {
+            this.debouncedSave('aiEndpoint', () => {
+              this.plugin.settings.aiEndpoint = value.replace(/\/+$/, '')
+            })
+          })
+        })
+    })
+
+    // 模型下拉
+    const currentService = serviceOptions.find(o => o.value === this.plugin.settings.aiServiceType)
+    const modelList = currentService?.models || []
+
+    aiGroup.addSetting((s) => {
+      s.setName('模型')
+      if (modelList.length > 0) {
+        s.addDropdown((dropdown) => {
+          for (const m of modelList) {
+            dropdown.addOption(m, m)
+          }
+          dropdown.setValue(this.plugin.settings.aiModel)
+          dropdown.onChange(async (value) => {
+            this.plugin.settings.aiModel = value
+            await this.plugin.saveSettings()
+          })
+        })
+      }
+      else {
+        s.addText((text) => {
+          text.setPlaceholder('输入模型名称')
+          text.setValue(this.plugin.settings.aiModel)
+          text.onChange((value) => {
+            this.debouncedSave('aiModel', () => {
+              this.plugin.settings.aiModel = value
+            })
+          })
+        })
+      }
+    })
+
+    aiGroup.addSetting(s => s
+      .setName('API Key')
+      .setDesc('内置服务无需填写')
+      .addText((text) => {
+        text.inputEl.type = 'password'
+        text.setPlaceholder('sk-...')
+        text.setValue(this.plugin.settings.aiApiKey)
+        text.onChange((value) => {
+          this.debouncedSave('aiApiKey', () => {
+            this.plugin.settings.aiApiKey = value
+          })
+        })
+      }))
+
+    aiGroup.addSetting(s => s
+      .setName('温度')
+      .setDesc('0-2，值越大输出越随机')
+      .addText((text) => {
+        text.setPlaceholder('1')
+        text.setValue(String(this.plugin.settings.aiTemperature))
+        text.onChange((value) => {
+          this.debouncedSave('aiTemperature', () => {
+            const num = Number.parseFloat(value)
+            if (!Number.isNaN(num) && num >= 0 && num <= 2) {
+              this.plugin.settings.aiTemperature = num
+            }
+          })
+        })
+      }))
+
+    aiGroup.addSetting(s => s
+      .setName('最大 Token 数')
+      .addText((text) => {
+        text.setPlaceholder('4096')
+        text.setValue(String(this.plugin.settings.aiMaxTokens))
+        text.onChange((value) => {
+          this.debouncedSave('aiMaxTokens', () => {
+            const num = Number.parseInt(value, 10)
+            if (!Number.isNaN(num) && num > 0) {
+              this.plugin.settings.aiMaxTokens = num
+            }
+          })
+        })
+      }))
+
+    aiGroup.addSetting(s => s
+      .setName('润色提示词')
+      .setDesc('自定义 AI 润色的 system prompt')
+      .addTextArea((text) => {
+        text.inputEl.rows = 6
+        text.inputEl.cols = 50
+        text.inputEl.style.fontFamily = 'monospace'
+        text.inputEl.style.fontSize = '12px'
+        text.setValue(this.plugin.settings.aiPolishPrompt)
+        text.onChange((value) => {
+          this.debouncedSave('aiPolishPrompt', () => {
+            this.plugin.settings.aiPolishPrompt = value
+          })
+        })
+      }))
 
     // 微信公众号推送
     new SettingGroup(containerEl)

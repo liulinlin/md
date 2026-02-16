@@ -43,6 +43,15 @@ export interface PluginSettings {
   // 自定义 CSS
   customCSS: string
 
+  // AI 润色
+  aiServiceType: string
+  aiEndpoint: string
+  aiModel: string
+  aiApiKey: string
+  aiTemperature: number
+  aiMaxTokens: number
+  aiPolishPrompt: string
+
   // 微信公众号推送
   wxAccounts: WxAccount[]
   wxProxyUrl: string
@@ -80,6 +89,14 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   jinaHeadingStyle: 'setext',
 
   customCSS: '',
+
+  aiServiceType: 'default',
+  aiEndpoint: 'https://proxy-ai.doocs.org/v1',
+  aiModel: 'Qwen/Qwen2.5-7B-Instruct',
+  aiApiKey: '',
+  aiTemperature: 1,
+  aiMaxTokens: 4096,
+  aiPolishPrompt: '你是一名专业的文章润色助手。请对以下 Markdown 文章进行润色，优化措辞、修正语法错误、改善句子流畅度。要求：\n1. 保持原文的 Markdown 格式不变\n2. 不要改变文章的核心观点和结构\n3. 只输出润色后的 Markdown 内容，不要输出任何额外说明',
 
   wxAccounts: [],
   wxProxyUrl: 'https://wx-proxy.codeby.cc',
