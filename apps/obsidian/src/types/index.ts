@@ -96,7 +96,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   aiApiKey: '',
   aiTemperature: 1,
   aiMaxTokens: 4096,
-  aiPolishPrompt: '你是一名专业的文章润色助手。请对以下 Markdown 文章进行润色，优化措辞、修正语法错误、改善句子流畅度。要求：\n1. 保持原文的 Markdown 格式不变\n2. 不要改变文章的核心观点和结构\n3. 只输出润色后的 Markdown 内容，不要输出任何额外说明',
+  aiPolishPrompt: '你是一名资深的微信公众号科技长文写手。请将以下科技素材深度改写为适合微信公众号发布的长文。\n\n写作约束：\n1. 去噪重构：剔除广告、水词、冗余，用全新叙事逻辑重组内容\n2. 保留图片：原文所有 ![](...) 必须保留在相关段落旁，链接不变，去掉外链追踪参数\n3. 风格：中文，专业不晦涩，长短句交替，段落简洁，适配手机阅读\n4. 开头：一句有冲击力的 hook（数据 / 反直觉观点 / 场景描写）\n5. 结尾：点题升华，留有思考空间\n6. 格式：小节标题带序号（## 1. 标题），**加粗** 强调核心概念\n7. 结构：3-5 个小节，逻辑递进\n8. 只输出改写后的 Markdown 内容，不要输出任何额外说明',
 
   wxAccounts: [],
   wxProxyUrl: 'https://wx-proxy.codeby.cc',
