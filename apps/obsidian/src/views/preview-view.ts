@@ -5,7 +5,7 @@ import { initRenderer } from '@md/core/renderer'
 import { generateCSSVariables } from '@md/core/theme'
 import { modifyHtmlContent } from '@md/core/utils'
 import { baseCSSContent, themeMap } from '@md/shared/configs'
-import { ItemView, Notice } from 'obsidian'
+import { ItemView, Notice, Platform } from 'obsidian'
 import { polishMarkdown } from '../core/ai-polish'
 import { copyToClipboard, inlineCSS } from '../core/clipboard'
 import { ObsidianSyntaxPreprocessor } from '../core/preprocessor'
@@ -52,6 +52,11 @@ export class PreviewView extends ItemView {
 
     const copyBtn = toolbar.createEl('button', { text: '复制' })
     copyBtn.addEventListener('click', () => this.handleCopy())
+
+    if (Platform.isMobile) {
+      const copyMdBtn = toolbar.createEl('button', { text: 'MD复制' })
+      copyMdBtn.addEventListener('click', () => this.handleCopyMarkdown())
+    }
 
     const refreshBtn = toolbar.createEl('button', { text: '刷新' })
     refreshBtn.addEventListener('click', () => this.updatePreview())
@@ -287,6 +292,24 @@ export class PreviewView extends ItemView {
       const msg = err instanceof Error ? err.message : String(err)
       console.error('[WeChat Publisher] Push failed:', err)
       new Notice(`推送失败: ${msg}`, 5000)
+    }
+  }
+
+  async handleCopyMarkdown(): Promise<void> {
+    const activeFile = this.app.workspace.getActiveFile()
+    if (!activeFile || activeFile.extension !== 'md') {
+      new Notice('请先打开一个 Markdown 文件', 1500)
+      return
+    }
+
+    try {
+      const markdown = await this.app.vault.read(activeFile)
+      await navigator.clipboard.writeText(markdown)
+      new Notice('Markdown 已复制到剪贴板', 1500)
+    }
+    catch (err) {
+      console.error('Copy markdown failed:', err)
+      new Notice('复制失败，请重试', 1500)
     }
   }
 
