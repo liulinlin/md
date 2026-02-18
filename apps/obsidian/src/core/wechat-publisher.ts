@@ -1,6 +1,7 @@
 import type { App, TFile } from 'obsidian'
 import type { PluginSettings, WxAccount } from '../types'
 import { requestUrl } from 'obsidian'
+import { resolveFile } from '../utils/resolve-file'
 import { inlineCSS } from './clipboard'
 import {
   wxAddDraft,
@@ -83,9 +84,13 @@ function extractFirstImage(html: string): string | null {
 }
 
 /**
- * 将图片 src 转为 ArrayBuffer + 文件名，支持 data URI 和 HTTP(S) URL
+ * 将图片 src 转为 ArrayBuffer + 文件名，支持 data URI、HTTP(S) URL 和本地 vault 文件路径
  */
-async function fetchImageAsBuffer(src: string): Promise<{ data: ArrayBuffer, filename: string } | null> {
+async function fetchImageAsBuffer(
+  src: string,
+  app?: App,
+  currentFile?: TFile,
+): Promise<{ data: ArrayBuffer, filename: string } | null> {
   if (src.startsWith('data:image')) {
     const decoded = decodeDataUri(src)
     if (!decoded)
@@ -95,6 +100,15 @@ async function fetchImageAsBuffer(src: string): Promise<{ data: ArrayBuffer, fil
 
   if (src.startsWith('http://') || src.startsWith('https://')) {
     return fetchRemoteImage(src, 'cover')
+  }
+
+  // 本地文件路径（多级回退：链接解析 → 精确路径 → 附件文件夹）
+  if (app && currentFile) {
+    const file = resolveFile(app, src, currentFile)
+    if (file) {
+      const data = await app.vault.readBinary(file)
+      return { data, filename: file.name }
+    }
   }
 
   return null
@@ -142,7 +156,7 @@ export async function publish(
     const firstImgSrc = extractFirstImage(content)
     if (firstImgSrc) {
       console.log('尝试使用文章中的第一张图片作为封面:', firstImgSrc)
-      const imgBuffer = await fetchImageAsBuffer(firstImgSrc)
+      const imgBuffer = await fetchImageAsBuffer(firstImgSrc, app, file)
       if (imgBuffer) {
         try {
           thumbMediaId = await wxUploadCover(wxProxyUrl, token, imgBuffer.data, imgBuffer.filename)
@@ -163,8 +177,8 @@ export async function publish(
     throw new Error('未找到封面图。请在 frontmatter 中设置 cover 字段，或在公众号后台上传至少一张图片素材。')
   }
 
-  // 4. 上传图片并替换 URL
-  content = await replaceImages(wxProxyUrl, token, content)
+  // 4. 上传图片并替换 URL（含本地 vault 图片）
+  content = await replaceImages(wxProxyUrl, token, content, app, file)
 
   // 5. 组装文章
   const articleTitle = fm.title || title
@@ -187,7 +201,7 @@ export async function publish(
  * 提取并上传 HTML 中所有 <img> 的图片，替换为微信 CDN URL
  * 并发下载和上传（最多 5 个并行），使用精确位置替换避免误替换
  */
-async function replaceImages(proxyUrl: string, token: string, html: string): Promise<string> {
+async function replaceImages(proxyUrl: string, token: string, html: string, app: App, sourceFile: TFile): Promise<string> {
   const imgRegex = /<img\s[^>]*src="([^"]+)"[^>]*>/g
   const matches = [...html.matchAll(imgRegex)]
 
@@ -218,6 +232,14 @@ async function replaceImages(proxyUrl: string, token: string, html: string): Pro
       return { src, fullMatch: match[0], imageData: result.data, filename: result.filename }
     }
 
+    // 本地 vault 文件路径（如 attachments/IMG_8371.jpeg）
+    const localFile = resolveFile(app, src, sourceFile)
+    if (localFile) {
+      const data = await app.vault.readBinary(localFile)
+      return { src, fullMatch: match[0], imageData: data, filename: localFile.name }
+    }
+
+    console.warn('[WeChat Publisher] 无法解析图片路径:', src)
     return null
   }
 
@@ -267,8 +289,8 @@ async function fetchCoverImage(
     return fetchRemoteImage(cover, 'cover')
   }
 
-  // 本地文件路径
-  const file = app.metadataCache.getFirstLinkpathDest(cover, currentFile.path)
+  // 本地文件路径（多级回退：链接解析 → 精确路径 → 附件文件夹）
+  const file = resolveFile(app, cover, currentFile)
   if (file) {
     const data = await app.vault.readBinary(file)
     return { data, filename: file.name }

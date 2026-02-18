@@ -1,5 +1,6 @@
 import type { App, TFile } from 'obsidian'
 import type { PluginSettings } from '../types'
+import { resolveFile } from '../utils/resolve-file'
 
 /**
  * Obsidian 语法预处理器
@@ -37,8 +38,7 @@ export class ObsidianSyntaxPreprocessor {
     const linkRegex = /\[\[([^\]|]+)(\|([^\]]+))?\]\]/g
 
     return markdown.replace(linkRegex, (_match, target, _pipe, alias) => {
-      const file = this.app.metadataCache
-        .getFirstLinkpathDest(target, this.currentFile.path)
+      const file = resolveFile(this.app, target, this.currentFile)
 
       if (!file)
         return alias || target
@@ -58,8 +58,7 @@ export class ObsidianSyntaxPreprocessor {
     // 从后往前替换，避免 offset 偏移
     for (const match of matches.reverse()) {
       const target = match[1]
-      const file = this.app.metadataCache
-        .getFirstLinkpathDest(target.split('#')[0], this.currentFile.path)
+      const file = resolveFile(this.app, target.split('#')[0], this.currentFile)
 
       if (!file || match.index === undefined)
         continue

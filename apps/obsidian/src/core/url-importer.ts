@@ -2,7 +2,8 @@ import type { PluginSettings } from '../types'
 import { requestUrl } from 'obsidian'
 
 const DEFAULT_ANYTHING_MD_API = 'https://anything-md.doocs.org/'
-const JINA_READER_API = 'https://r.jina.ai/'
+// const JINA_READER_API = 'https://r.jina.ai/'
+const JINA_READER_API = 'https://jina.codeby.cc/'
 const DEFAULT_JINA_KEY = 'jina_b2a6bdbd297f4fc2bc890ace1e9dc896eFSHApz4Zu4M_uF5dYQeqFVEkNd-'
 
 export async function fetchViaAnythingMd(url: string, settings: PluginSettings): Promise<string> {
@@ -39,6 +40,8 @@ export async function fetchViaJina(url: string, settings: PluginSettings): Promi
       'X-Md-Em-Delimiter': settings.jinaEmDelimiter,
       'X-Engine': settings.jinaEngine,
       'X-Md-Heading-Style': settings.jinaHeadingStyle,
+      'Origin': '', // 尝试覆盖
+      'Sec-Fetch-Site': '', // 尝试清除},
     },
   })
 
