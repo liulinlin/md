@@ -13,6 +13,7 @@ import { publishToAll } from '../core/wechat-publisher'
 import { ensureMathJax } from '../main'
 import { PushAccountModal } from '../modals/push-account-modal'
 import { PREVIEW_VIEW_TYPE } from '../types'
+import { resolveFile } from '../utils/resolve-file'
 /* eslint-disable no-new */
 export class PreviewView extends ItemView {
   plugin: WeChatPublisherPlugin
@@ -173,6 +174,9 @@ export class PreviewView extends ItemView {
 
       const outputEl = this.previewEl.createDiv({ attr: { id: 'output' } })
       outputEl.innerHTML = html
+
+      // 将本地 vault 路径替换为 Obsidian resource URL 以便预览显示
+      this.fixLocalImageSources(outputEl)
     }
     catch (err) {
       console.error('[WeChat Publisher] Render error:', err)
@@ -181,6 +185,37 @@ export class PreviewView extends ItemView {
       errorEl.style.cssText = 'padding:16px;color:#dc2626;font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;'
       const error = err instanceof Error ? err : new Error(String(err))
       errorEl.textContent = `渲染失败:\n\n${error.message}\n\n${error.stack || ''}`
+    }
+  }
+
+  /**
+   * 将 HTML 中本地 vault 路径的 <img> src 替换为 Obsidian resource URL
+   * 仅影响预览显示，不修改 lastHtml（推送时使用原始 vault 路径）
+   */
+  private fixLocalImageSources(container: HTMLElement): void {
+    const activeFile = this.app.workspace.getActiveFile()
+    if (!activeFile)
+      return
+
+    const imgs = container.querySelectorAll('img')
+    for (const img of imgs) {
+      const src = img.getAttribute('src')
+      if (!src)
+        continue
+      // 跳过已是远程 URL、data URI 或已处理的 app:// URL
+      if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:') || src.startsWith('app://'))
+        continue
+
+      try {
+        const decodedSrc = decodeURIComponent(src)
+        const file = resolveFile(this.app, decodedSrc, activeFile)
+        if (file) {
+          img.setAttribute('src', this.app.vault.getResourcePath(file))
+        }
+      }
+      catch {
+        // 路径解析失败，保持原样
+      }
     }
   }
 

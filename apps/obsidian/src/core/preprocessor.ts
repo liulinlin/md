@@ -23,7 +23,10 @@ export class ObsidianSyntaxPreprocessor {
     // 3. 处理嵌入（异步：涉及文件读取）
     markdown = await this.resolveEmbeds(markdown)
 
-    // 4. 处理标签（可选）
+    // 4. 处理标准 Markdown 本地图片 ![alt](local-path) → base64
+    markdown = await this.resolveMarkdownImages(markdown)
+
+    // 5. 处理标签（可选）
     if (this.settings.removeTags) {
       markdown = markdown.replace(/(^|\s)#[\w\u4E00-\u9FFF-]+/g, '$1')
     }
@@ -85,6 +88,43 @@ export class ObsidianSyntaxPreprocessor {
       markdown = markdown.slice(0, match.index)
         + replacement
         + markdown.slice(match.index + match[0].length)
+    }
+
+    return markdown
+  }
+
+  /**
+   * 解析标准 Markdown 图片 ![alt](local-path) → 规范化 vault 路径
+   * 通过 resolveFile 多级回退解析，将相对路径/附件路径统一为 vault 绝对路径
+   * 预览时由 preview-view 将 vault 路径替换为 resource URL 显示
+   * 推送时由 replaceImages 直接从 vault 读取二进制上传
+   */
+  private async resolveMarkdownImages(markdown: string): Promise<string> {
+    const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g
+    const matches = [...markdown.matchAll(imageRegex)]
+
+    // 从后往前替换，避免 offset 偏移
+    for (const match of matches.reverse()) {
+      const [, alt, src] = match
+
+      // 跳过远程 URL 和 data URI
+      if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:'))
+        continue
+
+      if (match.index === undefined)
+        continue
+
+      const file = resolveFile(this.app, decodeURIComponent(src), this.currentFile)
+      if (!file || !this.isImageFile(file))
+        continue
+
+      // 仅规范化路径，不转 base64（避免推送时 413）
+      if (file.path !== src) {
+        const replacement = `![${alt}](${encodeURI(file.path)})`
+        markdown = markdown.slice(0, match.index)
+          + replacement
+          + markdown.slice(match.index + match[0].length)
+      }
     }
 
     return markdown
