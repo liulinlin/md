@@ -197,7 +197,7 @@ export class PreviewView extends ItemView {
     if (!activeFile)
       return
 
-    const imgs = container.querySelectorAll('img')
+    const imgs = Array.from(container.querySelectorAll('img'))
     for (const img of imgs) {
       const src = img.getAttribute('src')
       if (!src)

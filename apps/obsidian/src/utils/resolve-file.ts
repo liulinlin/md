@@ -12,6 +12,19 @@ export function resolveFile(app: App, nameOrPath: string, sourceFile: TFile): TF
   if (!nameOrPath)
     return null
 
+  try {
+    return resolveFileInner(app, nameOrPath, sourceFile)
+  }
+  catch {
+    // Obsidian API（如 getFirstLinkpathDest）在 metadata cache 未就绪
+    // 或文件名含空格等情况下可能内部抛出异常，降级到全局搜索
+    const fileName = nameOrPath.split('/').pop() || nameOrPath
+    const found = app.vault.getFiles().find(f => f.name === fileName)
+    return found ?? null
+  }
+}
+
+function resolveFileInner(app: App, nameOrPath: string, sourceFile: TFile): TFile | null {
   // 第 1 级：标准链接解析
   const linked = app.metadataCache.getFirstLinkpathDest(nameOrPath, sourceFile.path)
   if (linked)
