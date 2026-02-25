@@ -17,11 +17,11 @@ export class ObsidianSyntaxPreprocessor {
     // 1. 移除注释 %%...%%
     markdown = markdown.replace(/%%.*?%%/gs, '')
 
-    // 2. 处理 Wiki 链接（同步）
-    markdown = this.resolveWikiLinks(markdown)
-
-    // 3. 处理嵌入（异步：涉及文件读取）
+    // 2. 处理嵌入（必须在 Wiki 链接之前，否则 ![[...]] 中的 [[...]] 会被 resolveWikiLinks 吞掉）
     markdown = await this.resolveEmbeds(markdown)
+
+    // 3. 处理 Wiki 链接（同步）
+    markdown = this.resolveWikiLinks(markdown)
 
     // 4. 处理标准 Markdown 本地图片 ![alt](local-path) → base64
     markdown = await this.resolveMarkdownImages(markdown)
