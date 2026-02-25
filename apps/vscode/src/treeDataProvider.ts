@@ -1,6 +1,6 @@
 import type { ThemeName } from '@md/shared/configs'
 import * as vscode from 'vscode'
-import { colorOptions, fontFamilyOptions, fontSizeOptions, themeOptions } from './styleChoices'
+import { colorOptions, fontFamilyOptions, fontSizeOptions, legendOptions, themeOptions } from './styleChoices'
 
 export class MarkdownTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private _onDidChangeTreeData: vscode.EventEmitter<vscode.TreeItem | undefined> = new vscode.EventEmitter<vscode.TreeItem | undefined>()
@@ -11,6 +11,11 @@ export class MarkdownTreeDataProvider implements vscode.TreeDataProvider<vscode.
   private currentFontFamily: string
   private countStatus: boolean
   private isMacCodeBlock: boolean
+  private isUseIndent: boolean
+  private isUseJustify: boolean
+  private citeStatus: boolean
+  private isShowLineNumber: boolean
+  private legend: string
   private context: vscode.ExtensionContext
 
   constructor(context: vscode.ExtensionContext) {
@@ -21,6 +26,11 @@ export class MarkdownTreeDataProvider implements vscode.TreeDataProvider<vscode.
     this.currentFontFamily = this.context.workspaceState.get(`markdownPreview.fontFamily`, fontFamilyOptions[0].value)
     this.countStatus = this.context.workspaceState.get(`markdownPreview.countStatus`, false)
     this.isMacCodeBlock = this.context.workspaceState.get(`markdownPreview.isMacCodeBlock`, false)
+    this.isUseIndent = this.context.workspaceState.get(`markdownPreview.isUseIndent`, false)
+    this.isUseJustify = this.context.workspaceState.get(`markdownPreview.isUseJustify`, false)
+    this.citeStatus = this.context.workspaceState.get(`markdownPreview.citeStatus`, false)
+    this.isShowLineNumber = this.context.workspaceState.get(`markdownPreview.isShowLineNumber`, false)
+    this.legend = this.context.workspaceState.get(`markdownPreview.legend`, `none`)
   }
 
   getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
@@ -56,24 +66,24 @@ export class MarkdownTreeDataProvider implements vscode.TreeDataProvider<vscode.
         new vscode.TreeItem(`主题色`, vscode.TreeItemCollapsibleState.Expanded),
         new vscode.TreeItem(`计数状态`, vscode.TreeItemCollapsibleState.None),
         new vscode.TreeItem(`Mac代码块`, vscode.TreeItemCollapsibleState.None),
+        new vscode.TreeItem(`首行缩进`, vscode.TreeItemCollapsibleState.None),
+        new vscode.TreeItem(`两端对齐`, vscode.TreeItemCollapsibleState.None),
+        new vscode.TreeItem(`链接转脚注`, vscode.TreeItemCollapsibleState.None),
+        new vscode.TreeItem(`显示行号`, vscode.TreeItemCollapsibleState.None),
+        new vscode.TreeItem(`图片标题`, vscode.TreeItemCollapsibleState.Expanded),
       ].map((item) => {
-        if (item.label === `计数状态`) {
-          item.command = {
-            command: `markdown.toggleCountStatus`,
-            title: `Toggle Count Status`,
-            arguments: [],
-          }
-          if (this.countStatus) {
-            item.iconPath = new vscode.ThemeIcon(`check`)
-          }
+        const toggleMap: Record<string, { command: string, active: boolean }> = {
+          计数状态: { command: `markdown.toggleCountStatus`, active: this.countStatus },
+          Mac代码块: { command: `markdown.toggleMacCodeBlock`, active: this.isMacCodeBlock },
+          首行缩进: { command: `markdown.toggleUseIndent`, active: this.isUseIndent },
+          两端对齐: { command: `markdown.toggleUseJustify`, active: this.isUseJustify },
+          链接转脚注: { command: `markdown.toggleCiteStatus`, active: this.citeStatus },
+          显示行号: { command: `markdown.toggleShowLineNumber`, active: this.isShowLineNumber },
         }
-        else if (item.label === `Mac代码块`) {
-          item.command = {
-            command: `markdown.toggleMacCodeBlock`,
-            title: `Toggle Mac Code Block`,
-            arguments: [],
-          }
-          if (this.isMacCodeBlock) {
+        const toggle = toggleMap[item.label as string]
+        if (toggle) {
+          item.command = { command: toggle.command, title: toggle.command, arguments: [] }
+          if (toggle.active) {
             item.iconPath = new vscode.ThemeIcon(`check`)
           }
         }
@@ -148,8 +158,58 @@ export class MarkdownTreeDataProvider implements vscode.TreeDataProvider<vscode.
         return item
       }))
     }
+    else if (element.label === `图片标题`) {
+      return Promise.resolve(legendOptions.map((option) => {
+        const item = new vscode.TreeItem(`${option.label}  ${option.desc}`)
+        item.command = {
+          command: `markdown.setLegend`,
+          title: `Set Legend`,
+          arguments: [option.value],
+        }
+        if (option.value === this.legend) {
+          item.iconPath = new vscode.ThemeIcon(`check`)
+        }
+        return item
+      }))
+    }
     return Promise.resolve([])
   }
+
+  updateUseIndent(status: boolean): void {
+    this.isUseIndent = status
+    this.context.workspaceState.update(`markdownPreview.isUseIndent`, status)
+    this._onDidChangeTreeData.fire(undefined)
+  }
+
+  updateUseJustify(status: boolean): void {
+    this.isUseJustify = status
+    this.context.workspaceState.update(`markdownPreview.isUseJustify`, status)
+    this._onDidChangeTreeData.fire(undefined)
+  }
+
+  updateCiteStatus(status: boolean): void {
+    this.citeStatus = status
+    this.context.workspaceState.update(`markdownPreview.citeStatus`, status)
+    this._onDidChangeTreeData.fire(undefined)
+  }
+
+  updateShowLineNumber(status: boolean): void {
+    this.isShowLineNumber = status
+    this.context.workspaceState.update(`markdownPreview.isShowLineNumber`, status)
+    this._onDidChangeTreeData.fire(undefined)
+  }
+
+  updateLegend(legend: string): void {
+    this.legend = legend
+    this.context.workspaceState.update(`markdownPreview.legend`, legend)
+    this._onDidChangeTreeData.fire(undefined)
+  }
+
+  getCurrentUseIndent(): boolean { return this.isUseIndent }
+  getCurrentUseJustify(): boolean { return this.isUseJustify }
+  getCurrentCiteStatus(): boolean { return this.citeStatus }
+  getCurrentShowLineNumber(): boolean { return this.isShowLineNumber }
+  getCurrentLegend(): string { return this.legend }
 
   updateFontSize(size: string) {
     this.currentFontSize = size
@@ -193,5 +253,9 @@ export class MarkdownTreeDataProvider implements vscode.TreeDataProvider<vscode.
 
   getCurrentFontFamily() {
     return this.currentFontFamily
+  }
+
+  refresh(): void {
+    this._onDidChangeTreeData.fire(undefined)
   }
 }

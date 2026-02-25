@@ -18,12 +18,15 @@ export default function config() {
     output: {
       path: path.resolve(currentDir, `dist`),
       filename: `extension.js`,
-      libraryTarget: `commonjs2`,
+      library: { type: `commonjs2` },
     },
     externals: {
       vscode: `commonjs vscode`,
     },
     resolve: {
+      alias: {
+        'isomorphic-dompurify': path.resolve(currentDir, `src/dompurify-shim.ts`),
+      },
       extensions: [`.ts`, `.js`],
       fallback: {
         'bufferutil': false,
@@ -54,7 +57,6 @@ export default function config() {
       level: `log`,
     },
     optimization: {
-      usedExports: true,
       sideEffects: true,
     },
   }
