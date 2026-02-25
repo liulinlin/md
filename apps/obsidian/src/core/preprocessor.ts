@@ -69,11 +69,10 @@ export class ObsidianSyntaxPreprocessor {
       let replacement = ''
 
       if (this.isImageFile(file)) {
-        // 图片：读取为 base64
-        const binary = await this.app.vault.readBinary(file)
-        const base64 = this.arrayBufferToBase64(binary)
-        const mime = this.getMimeType(file.extension)
-        replacement = `![${file.basename}](data:${mime};base64,${base64})`
+        // 图片：转为标准 Markdown，使用 vault 路径
+        // 预览时由 fixLocalImageSources 替换为 resource URL
+        // 推送时由 replaceImages 从 vault 读取上传
+        replacement = `![${file.basename}](${encodeURI(file.path)})`
       }
       else if (file.extension === 'md') {
         // 笔记：展开内容（限制深度 1 级）
@@ -136,27 +135,5 @@ export class ObsidianSyntaxPreprocessor {
 
   private getRelativePath(file: TFile): string {
     return file.path
-  }
-
-  private getMimeType(ext: string): string {
-    const map: Record<string, string> = {
-      png: 'image/png',
-      jpg: 'image/jpeg',
-      jpeg: 'image/jpeg',
-      gif: 'image/gif',
-      svg: 'image/svg+xml',
-      webp: 'image/webp',
-      bmp: 'image/bmp',
-    }
-    return map[ext.toLowerCase()] || 'application/octet-stream'
-  }
-
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer)
-    let binary = ''
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i])
-    }
-    return btoa(binary)
   }
 }

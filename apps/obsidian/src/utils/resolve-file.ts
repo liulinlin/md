@@ -25,24 +25,52 @@ export function resolveFile(app: App, nameOrPath: string, sourceFile: TFile): TF
   // 第 3 级：在附件文件夹下查找
   const attachmentFolder = (app.vault as any).config?.attachmentFolderPath as string | undefined
   if (attachmentFolder) {
-    let folderPath: string
+    const sourceDir = sourceFile.path.substring(0, sourceFile.path.lastIndexOf('/'))
 
     if (attachmentFolder.startsWith('./')) {
       // 相对于当前文件所在目录
-      const sourceDir = sourceFile.path.substring(0, sourceFile.path.lastIndexOf('/'))
-      const relative = attachmentFolder.slice(2) // 去掉 './'
-      folderPath = sourceDir ? `${sourceDir}/${relative}` : relative
+      const relative = attachmentFolder.slice(2)
+      const folderPath = sourceDir ? `${sourceDir}/${relative}` : relative
+      const fullPath = folderPath ? `${folderPath}/${nameOrPath}` : nameOrPath
+      const inAttachments = app.vault.getFileByPath(fullPath)
+      if (inAttachments)
+        return inAttachments
     }
     else {
-      // 固定文件夹路径
-      folderPath = attachmentFolder
-    }
+      // 固定文件夹路径：先尝试 vault 根目录下的固定路径
+      const rootPath = `${attachmentFolder}/${nameOrPath}`
+      const inRoot = app.vault.getFileByPath(rootPath)
+      if (inRoot)
+        return inRoot
 
-    const fullPath = folderPath ? `${folderPath}/${nameOrPath}` : nameOrPath
-    const inAttachments = app.vault.getFileByPath(fullPath)
-    if (inAttachments)
-      return inAttachments
+      // 再尝试当前文件所在目录下的同名文件夹
+      if (sourceDir) {
+        const relativePath = `${sourceDir}/${attachmentFolder}/${nameOrPath}`
+        const inRelative = app.vault.getFileByPath(relativePath)
+        if (inRelative)
+          return inRelative
+      }
+
+      // 逐级向上查找父目录下的附件文件夹
+      let dir = sourceDir
+      while (dir.includes('/')) {
+        dir = dir.substring(0, dir.lastIndexOf('/'))
+        const parentPath = dir
+          ? `${dir}/${attachmentFolder}/${nameOrPath}`
+          : `${attachmentFolder}/${nameOrPath}`
+        const inParent = app.vault.getFileByPath(parentPath)
+        if (inParent)
+          return inParent
+      }
+    }
   }
+
+  // 第 4 级：按文件名全局搜索（metadata cache 未就绪时的兜底）
+  const fileName = nameOrPath.split('/').pop() || nameOrPath
+  const allFiles = app.vault.getFiles()
+  const found = allFiles.find(f => f.name === fileName)
+  if (found)
+    return found
 
   return null
 }

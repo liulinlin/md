@@ -32,7 +32,11 @@ function sanitizeHtml(html: string): string {
   )
 
   // XSS 处理
-  html = DOMPurify.sanitize(html, { ADD_TAGS: [`mp-common-profile`] })
+  // 扩展 URI 白名单：允许相对路径（无协议前缀），以便本地图片路径在 Obsidian 等环境中保留
+  html = DOMPurify.sanitize(html, {
+    ADD_TAGS: [`mp-common-profile`],
+    ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+  })
 
   // 还原被保护的内容
   html = html.replace(
