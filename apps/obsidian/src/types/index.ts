@@ -21,6 +21,7 @@ export interface PluginSettings {
   // 代码块
   isMacCodeBlock: boolean
   isShowLineNumber: boolean
+  codeBlockTheme: string
 
   // 渲染
   citeStatus: boolean
@@ -73,6 +74,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 
   isMacCodeBlock: true,
   isShowLineNumber: false,
+  codeBlockTheme: 'https://cdn-doocs.oss-cn-shenzhen.aliyuncs.com/npm/highlightjs/11.11.1/styles/github-dark.min.css',
 
   citeStatus: false,
   countStatus: false,

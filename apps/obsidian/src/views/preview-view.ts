@@ -25,6 +25,7 @@ export class PreviewView extends ItemView {
   private lastCss = ''
   private renderVersion = 0
   private debounceTimer: ReturnType<typeof setTimeout> | null = null
+  private hljsCache = new Map<string, string>()
 
   constructor(leaf: WorkspaceLeaf, plugin: WeChatPublisherPlugin) {
     super(leaf)
@@ -156,7 +157,11 @@ export class PreviewView extends ItemView {
       })
 
       const themeCSS = themeMap[this.plugin.settings.theme as ThemeName]
-      const css = `${variables}\n${baseCSSContent}\n${themeCSS}\n${this.plugin.settings.customCSS}`
+
+      // 获取 highlight.js 代码高亮主题 CSS
+      const hljsCSS = await this.fetchCodeBlockTheme(this.plugin.settings.codeBlockTheme)
+
+      const css = `${variables}\n${baseCSSContent}\n${themeCSS}\n${hljsCSS}\n${this.plugin.settings.customCSS}`
 
       // 竞态守卫：渲染完成后再次检查，避免覆盖更新的结果
       if (version !== this.renderVersion)
@@ -216,6 +221,25 @@ export class PreviewView extends ItemView {
       catch {
         // 路径解析失败，保持原样
       }
+    }
+  }
+
+  private async fetchCodeBlockTheme(url: string): Promise<string> {
+    if (!url)
+      return ''
+    const cached = this.hljsCache.get(url)
+    if (cached)
+      return cached
+    try {
+      const resp = await fetch(url)
+      if (!resp.ok)
+        return ''
+      const css = await resp.text()
+      this.hljsCache.set(url, css)
+      return css
+    }
+    catch {
+      return ''
     }
   }
 

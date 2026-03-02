@@ -2,7 +2,7 @@ import type { ThemeName } from '@md/shared/configs'
 import type { App } from 'obsidian'
 import type WeChatPublisherPlugin from '../main'
 import type { WxAccount } from '../types'
-import { colorOptions, fontFamilyOptions, fontSizeOptions, legendOptions, serviceOptions, themeOptions } from '@md/shared/configs'
+import { codeBlockThemeOptions, colorOptions, fontFamilyOptions, fontSizeOptions, legendOptions, serviceOptions, themeOptions } from '@md/shared/configs'
 import { Notice, PluginSettingTab, Setting, SettingGroup, TFolder } from 'obsidian'
 import { clearTokenCache, wxGetToken } from '../core/wechat-api'
 /* eslint-disable no-new */
@@ -134,6 +134,19 @@ export class WeChatPublisherSettingTab extends PluginSettingTab {
           toggle.setValue(this.plugin.settings.isShowLineNumber)
           toggle.onChange(async (value) => {
             this.plugin.settings.isShowLineNumber = value
+            await this.plugin.saveSettings()
+          })
+        }))
+      .addSetting(s => s
+        .setName('代码主题')
+        .setDesc('highlight.js 语法高亮主题')
+        .addDropdown((dropdown) => {
+          for (const opt of codeBlockThemeOptions) {
+            dropdown.addOption(opt.value, opt.label)
+          }
+          dropdown.setValue(this.plugin.settings.codeBlockTheme)
+          dropdown.onChange(async (value) => {
+            this.plugin.settings.codeBlockTheme = value
             await this.plugin.saveSettings()
           })
         }))

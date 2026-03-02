@@ -10,7 +10,7 @@
   "main": "main.js",
   "scripts": {
     "dev": "cross-env OBSIDIAN_VAULT_PATH=/Users/liulinlin/obsidian_仓库/AI杂货铺 node esbuild.config.mjs",
-    "windev": "cross-env OBSIDIAN_VAULT_PATH=F:/my_obsidian/AI杂货铺0x node esbuild.config.mjs",
+    "windev": "cross-env OBSIDIAN_VAULT_PATH=F:/my_obsidian/AI杂货铺 node esbuild.config.mjs",
     "build": "tsc -noEmit && node esbuild.config.mjs production",
     "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
