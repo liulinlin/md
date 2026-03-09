@@ -69,10 +69,9 @@ export class ObsidianSyntaxPreprocessor {
       let replacement = ''
 
       if (this.isImageFile(file)) {
-        // 图片：转为标准 Markdown，使用 vault 路径
-        // 预览时由 fixLocalImageSources 替换为 resource URL
-        // 推送时由 replaceImages 从 vault 读取上传
-        replacement = `![${file.basename}](${encodeURI(file.path)})`
+        // 图片：转为 base64
+        const base64 = await this.fileToBase64(file)
+        replacement = `![${file.basename}](${base64})`
       }
       else if (file.extension === 'md') {
         // 笔记：展开内容（限制深度 1 级）
@@ -93,10 +92,7 @@ export class ObsidianSyntaxPreprocessor {
   }
 
   /**
-   * 解析标准 Markdown 图片 ![alt](local-path) → 规范化 vault 路径
-   * 通过 resolveFile 多级回退解析，将相对路径/附件路径统一为 vault 绝对路径
-   * 预览时由 preview-view 将 vault 路径替换为 resource URL 显示
-   * 推送时由 replaceImages 直接从 vault 读取二进制上传
+   * 解析标准 Markdown 图片 ![alt](local-path) → base64 data URI
    */
   private async resolveMarkdownImages(markdown: string): Promise<string> {
     const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g
@@ -117,13 +113,12 @@ export class ObsidianSyntaxPreprocessor {
       if (!file || !this.isImageFile(file))
         continue
 
-      // 仅规范化路径，不转 base64（避免推送时 413）
-      if (file.path !== src) {
-        const replacement = `![${alt}](${encodeURI(file.path)})`
-        markdown = markdown.slice(0, match.index)
-          + replacement
-          + markdown.slice(match.index + match[0].length)
-      }
+      // 转换为 base64
+      const base64 = await this.fileToBase64(file)
+      const replacement = `![${alt}](${base64})`
+      markdown = markdown.slice(0, match.index)
+        + replacement
+        + markdown.slice(match.index + match[0].length)
     }
 
     return markdown
@@ -135,5 +130,34 @@ export class ObsidianSyntaxPreprocessor {
 
   private getRelativePath(file: TFile): string {
     return file.path
+  }
+
+  private async fileToBase64(file: TFile): Promise<string> {
+    const buffer = await this.app.vault.readBinary(file)
+    const base64 = this.arrayBufferToBase64(buffer)
+    const mimeType = this.getMimeType(file.extension)
+    return `data:${mimeType};base64,${base64}`
+  }
+
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i])
+    }
+    return btoa(binary)
+  }
+
+  private getMimeType(extension: string): string {
+    const mimeTypes: Record<string, string> = {
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      gif: 'image/gif',
+      svg: 'image/svg+xml',
+      webp: 'image/webp',
+      bmp: 'image/bmp',
+    }
+    return mimeTypes[extension.toLowerCase()] || 'image/png'
   }
 }
