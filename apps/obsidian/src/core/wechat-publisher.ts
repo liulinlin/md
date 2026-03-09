@@ -31,7 +31,10 @@ async function fetchWithWxHeaders(url: string) {
 async function fetchRemoteImage(url: string, prefix = 'image', defaultExt = 'jpg'): Promise<{ data: ArrayBuffer, filename: string } | null> {
   try {
     const res = await fetchWithWxHeaders(url)
-    const ext = new URL(url).pathname.split('.').pop() || defaultExt
+    const urlObj = new URL(url)
+    let ext = urlObj.searchParams.get('format') || urlObj.pathname.split('.').pop() || defaultExt
+    if (ext.includes('/'))
+      ext = defaultExt
     return { data: res.arrayBuffer, filename: `${prefix}.${ext}` }
   }
   catch {
@@ -135,7 +138,7 @@ export async function publish(
 
   // 1. 获取 access_token
   const token = await wxGetToken(wxProxyUrl, appId, appSecret)
-
+  // console.log(html)
   // 2. CSS 内联
   let content = inlineCSS(html, css)
 
@@ -155,7 +158,7 @@ export async function publish(
     // 尝试从文章内容提取第一张图片作为封面
     const firstImgSrc = extractFirstImage(content)
     if (firstImgSrc) {
-      console.log('尝试使用文章中的第一张图片作为封面:', firstImgSrc)
+      // console.log('尝试使用文章中的第一张图片作为封面:', firstImgSrc)
       const imgBuffer = await fetchImageAsBuffer(firstImgSrc, app, file)
       if (imgBuffer) {
         try {
@@ -215,6 +218,10 @@ async function replaceImages(proxyUrl: string, token: string, html: string, app:
 
   const prepareTask = async (match: RegExpExecArray): Promise<ImageTask | null> => {
     const src = match[1]
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
 
     if (src.startsWith('data:image')) {
       const decoded = decodeDataUri(src)
@@ -245,34 +252,38 @@ async function replaceImages(proxyUrl: string, token: string, html: string, app:
 
   const tasks = (await Promise.all(matches.map(m => prepareTask(m)))).filter((t): t is ImageTask => t !== null)
 
-  // 阶段 2：并发上传（限制并发数 5）
-  const CONCURRENCY = 5
+  // console.log(`[WeChat Publisher] 找到 ${matches.length} 个图片，准备上传 ${tasks.length} 个`)
+
+  // 阶段 2：串行上传（避免微信 API 并发限制）
   const urlMap = new Map<string, string>()
 
-  for (let i = 0; i < tasks.length; i += CONCURRENCY) {
-    const batch = tasks.slice(i, i + CONCURRENCY)
-    const results = await Promise.allSettled(
-      batch.map(async (task) => {
-        const cdnUrl = await wxUploadImage(proxyUrl, token, task.imageData, task.filename)
-        urlMap.set(task.src, cdnUrl)
-      }),
-    )
-    for (const r of results) {
-      if (r.status === 'rejected') {
-        console.warn('[WeChat Publisher] Image upload failed:', r.reason)
-      }
+  for (const task of tasks) {
+    try {
+      console.log(`[WeChat Publisher] 上传图片: ${task.filename}`)
+      const cdnUrl = await wxUploadImage(proxyUrl, token, task.imageData, task.filename)
+      console.log(`[WeChat Publisher] 上传成功: ${cdnUrl}`)
+      urlMap.set(task.src, cdnUrl)
+    }
+    catch (error) {
+      console.warn('[WeChat Publisher] Image upload failed:', error)
     }
   }
 
   // 阶段 3：从后往前精确替换 <img> 标签中的 src，避免误替换其他位置
   for (const match of [...matches].reverse()) {
     const src = match[1]
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
     const cdnUrl = urlMap.get(src)
     if (!cdnUrl || match.index === undefined)
       continue
-    const newTag = match[0].replace(src, cdnUrl)
+    const newTag = match[0].replace(match[1], cdnUrl)
     html = html.slice(0, match.index) + newTag + html.slice(match.index + match[0].length)
   }
+
+  // console.log('[WeChat Publisher] 替换后的 HTML (前500字符):', html.slice(0, 500))
 
   return html
 }
