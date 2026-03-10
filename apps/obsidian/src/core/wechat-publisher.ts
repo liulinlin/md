@@ -147,8 +147,10 @@ export async function publish(
   let thumbMediaId = ''
 
   if (fm.cover) {
+    console.log('[WeChat Publisher] frontmatter 中指定了封面:', fm.cover)
     // frontmatter 指定了封面 → 上传为永久素材
     const coverData = await fetchCoverImage(app, file, fm.cover)
+    console.log('[WeChat Publisher] 获取封面数据:', coverData ? '成功' : '失败')
     if (coverData) {
       thumbMediaId = await wxUploadCover(wxProxyUrl, token, coverData.data, coverData.filename)
     }
@@ -176,9 +178,9 @@ export async function publish(
     thumbMediaId = await wxBatchGetMaterial(wxProxyUrl, token) || ''
   }
 
-  if (!thumbMediaId) {
-    throw new Error('未找到封面图。请在 frontmatter 中设置 cover 字段，或在公众号后台上传至少一张图片素材。')
-  }
+  // if (!thumbMediaId) {
+  //   throw new Error('未找到封面图。请在 frontmatter 中设置 cover 字段，或在公众号后台上传至少一张图片素材。')
+  // }
 
   // 4. 上传图片并替换 URL（含本地 vault 图片）
   content = await replaceImages(wxProxyUrl, token, content, app, file)
@@ -296,12 +298,16 @@ async function fetchCoverImage(
   currentFile: TFile,
   cover: string,
 ): Promise<{ data: ArrayBuffer, filename: string } | null> {
+  // 剥离 Obsidian wiki-link 语法，如 [[image.jpg]] 或 [[image.jpg|别名]]
+  cover = cover.replace(/^\[\[([^\]|]+)(?:\|[^\]]*)?\]\]$/, '$1').trim()
+
   if (cover.startsWith('http://') || cover.startsWith('https://')) {
     return fetchRemoteImage(cover, 'cover')
   }
 
   // 本地文件路径（多级回退：链接解析 → 精确路径 → 附件文件夹）
   const file = resolveFile(app, cover, currentFile)
+  console.log('[WeChat Publisher] 尝试解析封面路径:', cover, '解析结果:', file?.path)
   if (file) {
     const data = await app.vault.readBinary(file)
     return { data, filename: file.name }
